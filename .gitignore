@@ -33,3 +33,6 @@ rssi_reader
 .env
 *.key
 *.pem
+
+# Build artifacts
+.deps_build/

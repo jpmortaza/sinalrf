@@ -1,4 +1,4 @@
-/* SinalRF — Nav unificada + gestão de tema
+/* mtzHRF — Nav unificada + gestão de tema
    Injeta #srf-nav em todas as páginas.
    Expõe: window.srfNav.setWs(bool), window.srfNav.setHrf(bool)
 */
@@ -10,6 +10,7 @@
     { href: '/radio.html',     label: 'RÁDIO FM',     icon: '📻' },
     { href: '/scanner.html',   label: 'SCANNER',      icon: '🌌' },
     { href: '/3d.html',        label: '3D RF',        icon: '🔮' },
+    { href: '/doppler.html',   label: 'DOPPLER',      icon: '🫀' },
     { href: '/health.html',    label: 'SAÚDE',        icon: '❤️'  },
     { href: '/intercept.html', label: 'IMSI · INTCP', icon: '📱' },
   ];
@@ -44,7 +45,7 @@
     const title = t === 'neutral' ? 'Mudar para tema preto' : 'Mudar para tema neutro';
 
     return `
-      <a class="srf-logo" href="/">SINAL<span>RF</span></a>
+      <a class="srf-logo" href="/">mtz<span>HRF</span></a>
       <nav class="srf-links">${links}</nav>
       <div class="srf-right">
         <div class="srf-ws">

@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  SinalRF — app.js v2.0
+//  mtzHRF — app.js v2.0
 //  WiFi RSSI · HackRF Espectro Wideband · Doppler Corporal ·
 //  Radar Acústico · FM Monitor · Ghost Signals
 // ════════════════════════════════════════════════════════════════════

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-SinalRF — Plataforma de Sensoriamento RF + Áudio
+mtzHRF — Plataforma de Sensoriamento RF + Áudio
 WiFi RSSI · HackRF Espectro · Doppler Corporal · Radar Acústico
 """
 
 import asyncio
 import json
 import math
+import os
 import subprocess
 import threading
 import time
@@ -28,37 +29,182 @@ from spectrum_scanner import ScannerEspectro
 from intelligence_scanner import ScannerInteligente
 from imsi_scanner import ScannerIMSI
 import hackrf_resource
+try:
+    import llm_client
+    _LLM_OK = True
+except Exception:
+    _LLM_OK = False
 
 # ─── Radio FM Streaming ───────────────────────────────────────────────────────
 _radio_lock  = threading.Lock()   # apenas um stream por vez
 _radio_ativo = threading.Event()  # sinaliza que radio está em uso
 
-def _demodular_fm(iq_bytes: bytes, sr: int = 2_000_000, ar: int = 48_000) -> np.ndarray:
+# ─── FM Modulator ─────────────────────────────────────────────────────────────
+def _tts_para_wav(texto: str, voz: str = "Luciana") -> bytes:
+    """Usa macOS say + afconvert para gerar WAV mono 22050 Hz a partir de texto."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        aiff = os.path.join(tmp, "tts.aiff")
+        wav  = os.path.join(tmp, "tts.wav")
+        subprocess.run(["say", "-v", voz, "-o", aiff, "--", texto],
+                       check=True, timeout=30, capture_output=True)
+        subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@22050",
+                        aiff, wav], check=True, timeout=10, capture_output=True)
+        with open(wav, "rb") as f:
+            return f.read()
+
+
+def _modular_fm_iq(wav_bytes: bytes,
+                   sr_iq: int = 2_000_000,
+                   deviation: int = 75_000) -> bytes:
     """
-    Demodula FM wideband de bytes IQ (int8 intercalado I,Q).
-    Retorna PCM int16 mono a `ar` Hz.
+    Modula PCM WAV mono em FM wideband (WBFM) e retorna IQ int8 para hackrf_transfer.
+    Pre-emphasis 50µs (padrão CCIR/Brasil). Desvio padrão 75 kHz.
     """
+    import io, wave as _wave
+    with _wave.open(io.BytesIO(wav_bytes), "rb") as wf:
+        sr_audio = wf.getframerate()
+        n_ch     = wf.getnchannels()
+        raw      = wf.readframes(wf.getnframes())
+
+    pcm = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    if n_ch == 2:
+        pcm = (pcm[0::2] + pcm[1::2]) / 2   # stereo → mono
+
+    pcm = pcm / (np.max(np.abs(pcm)) + 1e-6) * 0.9   # normaliza com headroom
+
+    # Resample para sr_iq
+    gcd_val = math.gcd(sr_iq, sr_audio)
+    audio   = sp_signal.resample_poly(pcm, sr_iq // gcd_val, sr_audio // gcd_val)
+
+    # Pre-emphasis 50µs
+    tau      = 50e-6
+    bz, az   = sp_signal.bilinear([tau, 0], [tau, 1], fs=sr_iq)
+    audio    = sp_signal.lfilter(bz, az, audio)
+
+    # FM modulation: fase = integral cumulativa do áudio
+    k    = 2 * np.pi * deviation / sr_iq
+    fase = np.cumsum(audio * k)
+    iq   = np.exp(1j * fase).astype(np.complex64)
+
+    # Serializar I,Q int8 interleaved (formato hackrf_transfer)
+    out      = np.zeros(len(iq) * 2, dtype=np.int8)
+    out[0::2] = np.clip(iq.real * 120, -127, 127).astype(np.int8)
+    out[1::2] = np.clip(iq.imag * 120, -127, 127).astype(np.int8)
+    return out.tobytes()
+
+
+# Estado do broadcast de emergência
+_emergencia: dict = {
+    "ativo":        False,
+    "progresso":    "",
+    "freq_atual":   None,
+    "freq_total":   0,
+    "freq_idx":     0,
+    "iq_arquivo":   None,
+    "_thread":      None,
+    "_parar":       threading.Event(),
+}
+
+
+def _iq_from_bytes(iq_bytes: bytes) -> "np.ndarray":
+    """Converte int8 interleaved I,Q do hackrf_transfer em array complexo normalizado."""
     raw = np.frombuffer(iq_bytes, dtype=np.int8).astype(np.float32) / 128.0
-    if len(raw) < 4:
+    return (raw[0::2] + 1j * raw[1::2])
+
+def _normalizar_audio(audio: "np.ndarray", ar: int, amplitude: int = 28_000) -> "np.ndarray":
+    """Normaliza float32 → int16 PCM."""
+    mx = float(np.max(np.abs(audio))) + 1e-6
+    return (audio / mx * amplitude).astype(np.int16)
+
+def _resamplar(audio: "np.ndarray", sr: int, ar: int) -> "np.ndarray":
+    g = math.gcd(ar, sr)
+    return sp_signal.resample_poly(audio, ar // g, sr // g)
+
+
+def _demodular_fm(iq_bytes: bytes, sr: int = 2_000_000, ar: int = 48_000) -> np.ndarray:
+    """WFM — Wideband FM (rádio broadcast). Retorna PCM int16 mono."""
+    iq = _iq_from_bytes(iq_bytes)
+    if len(iq) < 4:
         return np.zeros(ar // 10, dtype=np.int16)
-    I, Q = raw[0::2], raw[1::2]
-    iq   = I + 1j * Q
-
-    # FM demod: argumento da derivada complexa
-    conj_prod = np.conj(iq[:-1]) * iq[1:]
-    demod     = np.angle(conj_prod)
-
-    # Passa-baixas: banda de áudio mono FM (15 kHz)
-    b, a  = sp_signal.butter(4, 15_000 / (sr / 2), btype="low")
+    # Discriminador FM por diferença de fase
+    demod = np.angle(np.conj(iq[:-1]) * iq[1:])
+    # Passa-baixas 15 kHz (banda de áudio FM mono)
+    b, a = sp_signal.butter(4, 15_000 / (sr / 2), btype="low")
     audio = sp_signal.lfilter(b, a, demod)
+    # De-ênfase 75 µs (padrão Americas)
+    tau = 75e-6
+    bz, az = sp_signal.bilinear([1], [tau, 1], fs=sr)
+    audio = sp_signal.lfilter(bz, az, audio)
+    return _normalizar_audio(_resamplar(audio, sr, ar), ar)
 
-    # Reamostragem: sr → ar  (2MHz → 48kHz = up=12, down=500 após GCD=4000)
-    gcd   = math.gcd(ar, sr)
-    audio_r = sp_signal.resample_poly(audio, ar // gcd, sr // gcd)
 
-    # Normaliza e converte para int16
-    mx = float(np.max(np.abs(audio_r))) + 1e-6
-    return (audio_r / mx * 28_000).astype(np.int16)
+def _demodular_nfm(iq_bytes: bytes, sr: int = 2_000_000, ar: int = 8_000,
+                   ch_bw: int = 12_500) -> np.ndarray:
+    """NFM — Narrow FM (VHF marino, UHF profissional, segurança pública, FRS).
+    ch_bw: largura do canal em Hz (12500 = padrão moderno, 25000 = legado).
+    Retorna PCM int16 mono."""
+    iq = _iq_from_bytes(iq_bytes)
+    if len(iq) < 4:
+        return np.zeros(ar // 10, dtype=np.int16)
+    nyq = sr / 2
+    # Isola canal NFM com lowpass (metade da largura do canal)
+    b, a = sp_signal.butter(5, (ch_bw / 2) / nyq, btype="low")
+    iq_f = sp_signal.lfilter(b, a, iq)
+    # Discriminador FM
+    demod = np.angle(np.conj(iq_f[:-1]) * iq_f[1:])
+    # Passa-faixa de voz 300–3400 Hz
+    b2, a2 = sp_signal.butter(4, [300 / nyq, 3400 / nyq], btype="band")
+    audio = sp_signal.lfilter(b2, a2, demod)
+    audio -= float(np.mean(audio))  # remove DC
+    return _normalizar_audio(_resamplar(audio, sr, ar), ar)
+
+
+def _demodular_am(iq_bytes: bytes, sr: int = 2_000_000, ar: int = 8_000,
+                  ch_bw: int = 8_000) -> np.ndarray:
+    """AM — Amplitude Modulation (aviação VHF 118–137 MHz, AM broadcast, militar VHF).
+    ch_bw: largura do canal em Hz (8000 = aviação, 10000 = AM broadcast).
+    Retorna PCM int16 mono."""
+    iq = _iq_from_bytes(iq_bytes)
+    if len(iq) < 4:
+        return np.zeros(ar // 10, dtype=np.int16)
+    nyq = sr / 2
+    # Lowpass para isolar canal AM
+    b, a = sp_signal.butter(5, (ch_bw / 2) / nyq, btype="low")
+    iq_f = sp_signal.lfilter(b, a, iq)
+    # Detecção de envelope (AM demod)
+    envelope = np.abs(iq_f)
+    # Remove portadora DC com highpass ~50 Hz
+    b2, a2 = sp_signal.butter(3, 50 / nyq, btype="high")
+    audio = sp_signal.lfilter(b2, a2, envelope)
+    # Passa-faixa de voz 300–3400 Hz
+    b3, a3 = sp_signal.butter(4, [300 / nyq, 3400 / nyq], btype="band")
+    audio = sp_signal.lfilter(b3, a3, audio)
+    return _normalizar_audio(_resamplar(audio, sr, ar), ar)
+
+
+# Mapeamento categoria → modo de demodulação
+_CAT_MODO = {
+    "FM":         ("WFM", 48_000),
+    "AERONAV":    ("AM",   8_000),
+    "VHF-MIL":    ("AM",   8_000),
+    "MARÍTIMO":   ("NFM",  8_000),
+    "FRS":        ("NFM",  8_000),
+    "VHF-UHF":    ("NFM",  8_000),
+    "UHF-PROF":   ("NFM",  8_000),
+    "DESCONHECIDO": ("NFM", 8_000),
+}
+# Categorias sem demodulação de áudio possível
+_CAT_NO_AUDIO = {"CELULAR", "WiFi-2G", "5G", "ISM-2G", "GNSS", "DAB", "DAB-L",
+                 "SAT-MET", "ISM-433"}
+
+def _demodular(iq_bytes: bytes, mode: str = "WFM", sr: int = 2_000_000) -> np.ndarray:
+    """Dispatcher multi-mode. mode: 'WFM' | 'NFM' | 'AM'."""
+    if mode == "NFM":
+        return _demodular_nfm(iq_bytes, sr=sr)
+    if mode == "AM":
+        return _demodular_am(iq_bytes, sr=sr)
+    return _demodular_fm(iq_bytes, sr=sr)  # WFM default
 
 
 # ─── Configuração ─────────────────────────────────────────────────────────────
@@ -427,13 +573,16 @@ async def raiz():
     return FileResponse(UI_PATH / "index.html")
 
 
-# ─── Radio FM: WebSocket de áudio em tempo real ───────────────────────────────
+# ─── Radio Multi-Mode: WebSocket de áudio em tempo real ─────────────────────
 @app.websocket("/ws/radio")
-async def ws_radio(ws: WebSocket, freq: float = Query(98.1)):
+async def ws_radio(ws: WebSocket,
+                   freq: float = Query(98.1),
+                   mode: str   = Query("WFM")):
     """
-    Recebe freq em MHz, captura IQ do HackRF continuamente,
-    demodula FM e envia PCM int16 mono 48kHz em chunks de 100ms.
-    Apenas um stream de rádio por vez (lock).
+    Recebe freq em MHz + mode (WFM/NFM/AM), captura IQ do HackRF,
+    demodula e envia PCM int16 mono em chunks de 100ms.
+    mode: 'WFM' (FM broadcast), 'NFM' (VHF marino/UHF), 'AM' (aviação)
+    Apenas um stream por vez (lock).
     """
     await ws.accept()
 
@@ -470,10 +619,17 @@ async def ws_radio(ws: WebSocket, freq: float = Query(98.1)):
         )
 
         # Avisa o cliente que o stream começou
+        # Taxa de áudio por modo
+        _mode = mode.upper()
+        if _mode not in ("WFM", "NFM", "AM"):
+            _mode = "WFM"
+        _ar_audio = 48_000 if _mode == "WFM" else 8_000
+
         await ws.send_text(json.dumps({
             "ok": True,
             "freq_mhz": freq,
-            "sample_rate": 48_000,
+            "mode": _mode,
+            "sample_rate": _ar_audio,
             "channels": 1,
             "bits": 16,
         }))
@@ -482,12 +638,13 @@ async def ws_radio(ws: WebSocket, freq: float = Query(98.1)):
 
         async def _ler_e_enviar():
             while True:
-                # Leitura bloqueante em thread separada
                 data = await loop.run_in_executor(None, proc.stdout.read, CHUNK_IQ)
                 if not data or len(data) < 1000:
                     break
-                # Demodulação FM em thread separada (CPU)
-                pcm = await loop.run_in_executor(None, _demodular_fm, data)
+                # Demodulação multi-mode em thread separada (CPU)
+                pcm = await loop.run_in_executor(
+                    None, _demodular, data, _mode, 2_000_000
+                )
                 try:
                     await ws.send_bytes(pcm.tobytes())
                 except Exception:
@@ -540,6 +697,19 @@ async def ws_intel(ws: WebSocket):
 async def api_intel():
     """Snapshot atual da inteligência espectral."""
     return sensor_intel.inteligencia()
+
+
+@app.get("/api/radio/modo")
+async def radio_modo_por_categoria(cat: str = Query(...)):
+    """
+    Retorna o modo de demodulação e se tem áudio para a categoria dada.
+    cat: categoria do sinal (ex: 'FM', 'AERONAV', 'CELULAR', ...)
+    """
+    if cat in _CAT_NO_AUDIO:
+        return {"audio": False, "modo": None,
+                "motivo": f"{cat} usa protocolo digital/criptografado — sem áudio"}
+    modo, ar = _CAT_MODO.get(cat, ("NFM", 8_000))
+    return {"audio": True, "modo": modo, "ar": ar}
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────
@@ -916,11 +1086,310 @@ async def imsi_limpar():
     return {"ok": True}
 
 
+# ─── LLM / IA Local ──────────────────────────────────────────────────────────
+
+# ─── Emergência Climática — Broadcast Multi-Frequência ───────────────────────
+
+@app.get("/api/emergencia/status")
+async def emergencia_status():
+    return {
+        "ativo":      _emergencia["ativo"],
+        "progresso":  _emergencia["progresso"],
+        "freq_atual": _emergencia["freq_atual"],
+        "freq_idx":   _emergencia["freq_idx"],
+        "freq_total": _emergencia["freq_total"],
+        "iq_pronto":  _emergencia["iq_arquivo"] is not None and os.path.exists(_emergencia["iq_arquivo"] or ""),
+    }
+
+
+@app.post("/api/emergencia/preparar")
+async def emergencia_preparar(body: dict):
+    """
+    Prepara o arquivo IQ para broadcast de emergência via TTS.
+    Body: { "texto": "...", "voz": "Luciana", "repeticoes": 2 }
+    """
+    texto = body.get("texto", "").strip()
+    if not texto:
+        raise HTTPException(400, "texto vazio")
+
+    voz        = body.get("voz", "Luciana")
+    repeticoes = max(1, min(10, int(body.get("repeticoes", 3))))
+
+    # Gera WAV via TTS em executor (bloqueante)
+    loop = asyncio.get_event_loop()
+    try:
+        wav_bytes = await loop.run_in_executor(None, _tts_para_wav, texto, voz)
+    except Exception as e:
+        raise HTTPException(500, f"TTS falhou: {e}")
+
+    # Multiplica o áudio pelas repetições (com pausa de 1s entre elas)
+    import io, wave as _wave
+    with _wave.open(io.BytesIO(wav_bytes), "rb") as wf:
+        sr = wf.getframerate()
+        raw = wf.readframes(wf.getnframes())
+    silencio = b'\x00\x00' * sr   # 1s de silêncio
+
+    pcm_total = (raw + silencio) * repeticoes
+    buf = io.BytesIO()
+    with _wave.open(buf, "wb") as wf2:
+        wf2.setnchannels(1); wf2.setsampwidth(2); wf2.setframerate(sr)
+        wf2.writeframes(pcm_total)
+    wav_final = buf.getvalue()
+
+    # Modula para IQ FM em executor
+    try:
+        iq_bytes = await loop.run_in_executor(None, _modular_fm_iq, wav_final)
+    except Exception as e:
+        raise HTTPException(500, f"Modulação FM falhou: {e}")
+
+    # Salva IQ em arquivo temporário
+    iq_path = str(Path(__file__).parent / "sinais" / "_emergencia.iq")
+    with open(iq_path, "wb") as f:
+        f.write(iq_bytes)
+
+    _emergencia["iq_arquivo"] = iq_path
+    duracao = len(iq_bytes) / (2 * 2_000_000)   # int8 I+Q @ 2Msps
+
+    return {
+        "ok":        True,
+        "iq_bytes":  len(iq_bytes),
+        "duracao_s": round(duracao, 1),
+        "repeticoes": repeticoes,
+        "voz":       voz,
+    }
+
+
+def _broadcast_thread(freqs_hz: list[int], ganho: int, iq_path: str):
+    """Transmite IQ em cada frequência sequencialmente."""
+    _emergencia["_parar"].clear()
+    _emergencia["ativo"]      = True
+    _emergencia["freq_total"] = len(freqs_hz)
+
+    # Pausa sensores — emergência tem prioridade máxima
+    hackrf_resource.zerar()
+    sensor_hackrf.pausar()
+    sensor_espectro.pausar()
+    sensor_intel.pausar()
+
+    for idx, freq_hz in enumerate(freqs_hz):
+        if _emergencia["_parar"].is_set():
+            break
+
+        freq_mhz = freq_hz / 1e6
+        _emergencia["freq_idx"]   = idx + 1
+        _emergencia["freq_atual"] = freq_mhz
+        _emergencia["progresso"]  = f"Transmitindo {freq_mhz} MHz ({idx+1}/{len(freqs_hz)})"
+        print(f"  🚨  EMERGÊNCIA: {freq_mhz} MHz (ganho {ganho} dB)")
+
+        if not hackrf_resource.acquire("emergencia", timeout=10.0):
+            hackrf_resource.zerar()
+            hackrf_resource.acquire("emergencia", timeout=5.0)
+
+        try:
+            proc = subprocess.Popen(
+                ["hackrf_transfer",
+                 "-t", iq_path,
+                 "-f", str(freq_hz),
+                 "-s", "2000000",
+                 "-x", str(ganho),
+                 "-a", "1"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            # Aguarda transmissão terminar (arquivo acaba) ou sinal de parar
+            while proc.poll() is None:
+                if _emergencia["_parar"].is_set():
+                    proc.terminate()
+                    break
+                time.sleep(0.2)
+        except Exception as e:
+            print(f"  🚨  Erro broadcast: {e}")
+        finally:
+            hackrf_resource.release()
+
+        # Pausa de 1s entre frequências
+        if not _emergencia["_parar"].is_set():
+            time.sleep(1.0)
+
+    _emergencia["ativo"]     = False
+    _emergencia["progresso"] = "Broadcast concluído"
+    _emergencia["freq_atual"] = None
+    sensor_hackrf.retomar()
+    sensor_espectro.retomar()
+    sensor_intel.retomar()
+    print("  🚨  EMERGÊNCIA: broadcast concluído")
+
+
+@app.post("/api/emergencia/transmitir")
+async def emergencia_transmitir(body: dict):
+    """
+    Inicia broadcast de emergência multi-frequência.
+    Body: { "freqs_mhz": [93.7, 98.1, 100.7], "ganho": 47 }
+    O IQ deve ter sido preparado via /api/emergencia/preparar antes.
+    """
+    if _emergencia["ativo"]:
+        raise HTTPException(409, "Broadcast já em andamento")
+
+    iq_path = _emergencia.get("iq_arquivo")
+    if not iq_path or not os.path.exists(iq_path):
+        raise HTTPException(400, "Prepare o IQ primeiro via /api/emergencia/preparar")
+
+    freqs_mhz = body.get("freqs_mhz", [])
+    if not freqs_mhz:
+        raise HTTPException(400, "Liste ao menos uma frequência")
+
+    ganho     = max(20, min(47, int(body.get("ganho", 47))))
+    freqs_hz  = [int(f * 1e6) for f in freqs_mhz]
+
+    t = threading.Thread(
+        target=_broadcast_thread,
+        args=(freqs_hz, ganho, iq_path),
+        daemon=True, name="emergencia-broadcast"
+    )
+    t.start()
+    _emergencia["_thread"] = t
+
+    return {"ok": True, "freqs": freqs_mhz, "ganho": ganho}
+
+
+@app.post("/api/emergencia/parar")
+async def emergencia_parar():
+    """Para o broadcast de emergência em andamento."""
+    _emergencia["_parar"].set()
+    subprocess.run(["pkill", "-9", "-f", "hackrf_transfer"], capture_output=True)
+    _emergencia["ativo"]     = False
+    _emergencia["progresso"] = "Broadcast interrompido"
+    sensor_hackrf.retomar(); sensor_espectro.retomar(); sensor_intel.retomar()
+    return {"ok": True}
+
+
+@app.get("/api/llm/status")
+async def llm_status():
+    """Estado do LLM local e modelos disponíveis."""
+    if not _LLM_OK:
+        return {"ok": False, "erro": "llm_client não disponível"}
+    try:
+        modelos = llm_client.detectar_modelos()
+        return {
+            "ok":            True,
+            "ollama":        True,
+            "embed_model":   modelos.get("embed"),
+            "chat_model":    modelos.get("chat"),
+            "todos_modelos": modelos.get("todos", []),
+            "chat_pronto":   modelos.get("chat") is not None,
+            "instrucao":     None if modelos.get("chat") else
+                "ollama pull qwen2.5:3b   ← 1.9 GB, ótimo em português",
+        }
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
+
+
+@app.post("/api/llm/chat")
+async def llm_chat(body: dict):
+    """
+    Chat com o LLM local com contexto RF em tempo real.
+    Body: { "mensagem": "...", "historico": [...] }
+    """
+    if not _LLM_OK:
+        raise HTTPException(503, "LLM não disponível")
+
+    mensagem = body.get("mensagem", "").strip()
+    if not mensagem:
+        raise HTTPException(400, "mensagem vazia")
+
+    historico = body.get("historico", [])
+
+    # Monta contexto RF atual
+    try:
+        ctx = {
+            "rssi":      None,
+            "variancia": None,
+            "espectro":  sensor_espectro.estado(),
+            "sinais":    sensor_intel.inteligencia().get("sinais", []),
+            "hackrf":    sensor_hackrf.estado(),
+        }
+    except Exception:
+        ctx = {}
+
+    loop = asyncio.get_event_loop()
+    try:
+        resposta = await loop.run_in_executor(
+            None, llm_client.chat, mensagem, ctx, None, historico
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Erro LLM: {e}")
+
+    return {"ok": True, "resposta": resposta}
+
+
+@app.post("/api/llm/classificar")
+async def llm_classificar(body: dict):
+    """
+    Classifica um sinal por embedding (nomic-embed-text).
+    Body: { "freq_mhz": 433.92, "dbm": -68, "descricao": "..." }
+    """
+    if not _LLM_OK:
+        raise HTTPException(503, "LLM não disponível")
+
+    freq  = body.get("freq_mhz", 0)
+    dbm   = body.get("dbm", -80)
+    desc  = body.get("descricao", "")
+
+    loop = asyncio.get_event_loop()
+    resultado = await loop.run_in_executor(
+        None, llm_client.classificar_sinal, freq, dbm, desc
+    )
+    return {"ok": True, **resultado}
+
+
+# WebSocket streaming de chat (para respostas longas)
+@app.websocket("/ws/llm")
+async def ws_llm(ws: WebSocket):
+    """WebSocket para chat com streaming de tokens do LLM."""
+    await ws.accept()
+    if not _LLM_OK:
+        await ws.send_text(json.dumps({"erro": "LLM não disponível"}))
+        await ws.close()
+        return
+    try:
+        while True:
+            raw = await ws.receive_text()
+            body = json.loads(raw)
+            mensagem = body.get("mensagem", "").strip()
+            if not mensagem:
+                continue
+
+            historico = body.get("historico", [])
+            ctx = {
+                "espectro": sensor_espectro.estado(),
+                "sinais":   sensor_intel.inteligencia().get("sinais", []),
+                "hackrf":   sensor_hackrf.estado(),
+            }
+
+            await ws.send_text(json.dumps({"tipo": "inicio"}))
+            loop = asyncio.get_event_loop()
+
+            # Streaming de tokens via executor (llm_client usa generator síncrono)
+            def _stream():
+                chunks = []
+                for chunk in llm_client.chat_stream(mensagem, ctx, None, historico):
+                    chunks.append(chunk)
+                return chunks
+
+            chunks = await loop.run_in_executor(None, _stream)
+            full = "".join(chunks)
+            await ws.send_text(json.dumps({"tipo": "texto", "conteudo": full}))
+            await ws.send_text(json.dumps({"tipo": "fim"}))
+
+    except (WebSocketDisconnect, Exception):
+        pass
+
+
 app.mount("/", StaticFiles(directory=str(UI_PATH), html=True), name="ui")
 
 if __name__ == "__main__":
     print()
-    print("  📡  SinalRF — Plataforma RF + Áudio + HackRF")
+    print("  📡  mtzHRF — Plataforma RF + Áudio + HackRF")
     print(f"  🌐  http://localhost:{PORTA}")
     print(f"  ℹ️   HackRF: scan 2.4GHz + doppler + espectro 88-900MHz")
     print()

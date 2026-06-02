@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzHRF // DOPPLER WIFI</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    body { overflow-x: hidden; }
+
+    /* ── HERO ─────────────────────────────────────────────────────── */
+    .dop-hero {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 0;
+      height: calc(100vh - 40px);
+      overflow: hidden;
+    }
+
+    /* ── COLUNA ESQUERDA ──────────────────────────────────────────── */
+    .dop-left {
+      display: flex; flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    /* Status bar do topo */
+    .dop-topbar {
+      display: flex; align-items: center; gap: 16px;
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2); flex-shrink: 0;
+    }
+    .dop-freq { font-size: 11px; color: var(--g3); letter-spacing: 1px; }
+    .dop-freq strong { color: var(--g); }
+    .dop-pills { display: flex; gap: 6px; margin-left: auto; }
+    .pill {
+      font-size: 9px; padding: 2px 8px; letter-spacing: 1px;
+      border: 1px solid var(--border2); color: var(--g3);
+    }
+    .pill.on { color: var(--g); border-color: var(--g); text-shadow: var(--glow-g); }
+
+    /* Radar principal */
+    .radar-wrap {
+      flex: 1; position: relative; display: flex;
+      align-items: center; justify-content: center;
+      overflow: hidden; background: var(--bg);
+    }
+    #radarCanvas { display: block; }
+
+    /* Ondas abaixo */
+    .waves-strip {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1px; background: var(--border);
+      border-top: 1px solid var(--border); flex-shrink: 0; height: 120px;
+    }
+    .wave-box {
+      background: var(--bg2); padding: 6px 10px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .wave-lbl {
+      font-size: 9px; letter-spacing: 2px; color: var(--g3);
+      display: flex; justify-content: space-between;
+    }
+    .wave-val { font-size: 18px; font-weight: 700; color: var(--g); }
+    .wave-val.r { color: var(--r); text-shadow: var(--glow-r); }
+    .wave-val.y { color: var(--y); text-shadow: var(--glow-y); }
+    canvas.wc { flex: 1; display: block; width: 100%; }
+
+    /* Stats row */
+    .stats-row {
+      display: flex; gap: 1px; background: var(--border);
+      border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    .stat-b {
+      flex: 1; padding: 8px 14px; background: var(--bg);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .stat-lbl { font-size: 9px; color: var(--g4); letter-spacing: 1px; }
+    .stat-val { font-size: 14px; font-weight: 700; color: var(--g2); }
+
+    /* ── COLUNA DIREITA — IA ──────────────────────────────────────── */
+    .dop-ai {
+      display: flex; flex-direction: column;
+      background: var(--bg); overflow: hidden;
+    }
+
+    .ai-head {
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg2); flex-shrink: 0;
+    }
+    .ai-head-title { font-size: 10px; letter-spacing: 2px; color: var(--g2); }
+    .ai-model { font-size: 9px; color: var(--g4); margin-left: auto; }
+    .ai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--g4); }
+    .ai-dot.on { background: var(--g); box-shadow: var(--glow-g); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* Análise automática */
+    .ai-auto {
+      padding: 10px 12px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ai-auto-lbl { font-size: 9px; color: var(--g4); letter-spacing: 1px; margin-bottom: 6px; }
+    .ai-insight {
+      font-size: 10px; color: var(--g2); line-height: 1.7;
+      min-height: 60px; max-height: 120px; overflow-y: auto;
+    }
+    .ai-insight.analisando { color: var(--g4); font-style: italic; }
+    .ai-refresh {
+      margin-top: 6px; background: transparent; border: 1px solid var(--border);
+      color: var(--g4); font-family: var(--font); font-size: 9px;
+      padding: 3px 8px; cursor: pointer; letter-spacing: 1px; transition: all .15s;
+    }
+    .ai-refresh:hover { border-color: var(--border2); color: var(--g); }
+
+    /* Chat */
+    .ai-chat {
+      flex: 1; overflow-y: auto; padding: 8px;
+      display: flex; flex-direction: column; gap: 6px; min-height: 0;
+    }
+    .msg { padding: 6px 9px; font-size: 10px; line-height: 1.6; }
+    .msg.user { background: var(--bg3); color: var(--g); border-left: 2px solid var(--g3); }
+    .msg.bot  { background: var(--bg2); color: var(--g2); border-left: 2px solid var(--border2); }
+    .msg.sys  { color: var(--g4); font-size: 9px; font-style: italic; }
+    .msg.alerta { background: rgba(255,59,48,.06); color: var(--r); border-left: 2px solid var(--r); }
+
+    /* Quick prompts */
+    .ai-quick {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      padding: 6px 10px; border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .qbtn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--g3); font-family: var(--font); font-size: 9px;
+      padding: 3px 7px; cursor: pointer; letter-spacing: .5px; transition: all .15s;
+    }
+    .qbtn:hover { border-color: var(--border2); color: var(--g); }
+
+    /* Input */
+    .ai-input-row {
+      display: flex; gap: 4px; padding: 8px 10px;
+      border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    .ai-inp {
+      flex: 1; background: var(--bg2); border: 1px solid var(--border2);
+      color: var(--g); font-family: var(--font); font-size: 10px;
+      padding: 5px 8px; outline: none;
+    }
+    .ai-inp:focus { border-color: var(--g3); }
+    .ai-send {
+      background: transparent; border: 1px solid var(--border2);
+      color: var(--g2); font-family: var(--font); font-size: 9px;
+      padding: 5px 12px; cursor: pointer; letter-spacing: 1px;
+    }
+    .ai-send:hover { border-color: var(--g); color: var(--g); }
+    .ai-send:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* Presença big indicator overlay */
+    #presencaOverlay {
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      text-align: center; pointer-events: none; z-index: 10;
+    }
+    #presStatus {
+      font-size: 20px; font-weight: 700; letter-spacing: 4px;
+      color: var(--g3); transition: all .5s;
+    }
+    #presStatus.det { color: var(--g); text-shadow: var(--glow-g); }
+    #presStatus.mov { color: var(--y); text-shadow: var(--glow-y); }
+    #presConf { font-size: 10px; color: var(--g4); letter-spacing: 1px; margin-top: 3px; }
+
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--g4); }
+  </style>
+</head>
+<body>
+<script src="nav.js"></script>
+
+<div class="dop-hero">
+
+  <!-- ── ESQUERDA: Visualização ─────────────────────────────────── -->
+  <div class="dop-left">
+
+    <!-- Top bar -->
+    <div class="dop-topbar">
+      <div class="dop-freq">
+        DOPPLER <strong>WIFI</strong> · 2.437 GHz · PASSIVO
+      </div>
+      <div class="dop-pills">
+        <span class="pill">SEM HACKRF</span>
+        <span class="pill">MICRO-DOPPLER</span>
+        <span class="pill on" id="pillPresenca">AGUARDANDO</span>
+      </div>
+    </div>
+
+    <!-- Radar canvas -->
+    <div class="radar-wrap">
+      <canvas id="radarCanvas"></canvas>
+      <div id="presencaOverlay">
+        <div id="presStatus">ANALISANDO</div>
+        <div id="presConf">aguardando dados…</div>
+      </div>
+    </div>
+
+    <!-- Waveforms -->
+    <div class="waves-strip">
+      <div class="wave-box">
+        <div class="wave-lbl">
+          <span>RESPIRAÇÃO</span>
+          <span class="wave-val y" id="respBpm">—</span>
+        </div>
+        <canvas class="wc" id="respCanvas" height="60"></canvas>
+        <div class="wave-lbl">
+          <span>bpm</span>
+          <span style="font-size:9px;color:var(--g4)" id="respConf">confiança: —</span>
+        </div>
+      </div>
+      <div class="wave-box">
+        <div class="wave-lbl">
+          <span>BATIMENTOS</span>
+          <span class="wave-val r" id="cardBpm">—</span>
+        </div>
+        <canvas class="wc" id="cardCanvas" height="60"></canvas>
+        <div class="wave-lbl">
+          <span>bpm</span>
+          <span style="font-size:9px;color:var(--g4)" id="cardConf">confiança: —</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-b"><div class="stat-lbl">RSSI WiFi</div><div class="stat-val" id="stRssi">— dBm</div></div>
+      <div class="stat-b"><div class="stat-lbl">VARIÂNCIA</div><div class="stat-val" id="stVar">—</div></div>
+      <div class="stat-b"><div class="stat-lbl">ATIVIDADE</div><div class="stat-val" id="stAtv" style="font-size:11px">—</div></div>
+      <div class="stat-b"><div class="stat-lbl">FONTE RESP.</div><div class="stat-val" id="stFonte" style="font-size:11px">—</div></div>
+    </div>
+  </div>
+
+  <!-- ── DIREITA: IA ─────────────────────────────────────────────── -->
+  <div class="dop-ai">
+
+    <div class="ai-head">
+      <div class="ai-dot" id="aiDot"></div>
+      <div class="ai-head-title">IA · ANÁLISE DOPPLER</div>
+      <div class="ai-model" id="aiModelLbl">—</div>
+    </div>
+
+    <!-- Auto-análise -->
+    <div class="ai-auto">
+      <div class="ai-auto-lbl">// ANÁLISE AUTOMÁTICA</div>
+      <div class="ai-insight analisando" id="aiInsight">
+        Conectando ao LLM local…
+      </div>
+      <button class="ai-refresh" onclick="solicitarAnalise()">⟳ ANALISAR AGORA</button>
+    </div>
+
+    <!-- Chat history -->
+    <div class="ai-chat" id="aiChat">
+      <div class="msg sys">Faça perguntas sobre os dados de presença e sinais vitais detectados pelo Doppler WiFi.</div>
+    </div>
+
+    <!-- Quick prompts -->
+    <div class="ai-quick">
+      <button class="qbtn" onclick="pergunta('Tem alguém no ambiente?')">Presença?</button>
+      <button class="qbtn" onclick="pergunta('Os sinais vitais estão normais?')">Vitais OK?</button>
+      <button class="qbtn" onclick="pergunta('Descreva o padrão respiratório atual')">Respiração</button>
+      <button class="qbtn" onclick="pergunta('Há algo anormal nos dados?')">Anomalia?</button>
+      <button class="qbtn" onclick="pergunta('Qual a confiança da detecção atual?')">Confiança</button>
+      <button class="qbtn" onclick="pergunta('Gere um relatório completo dos dados')">Relatório</button>
+    </div>
+
+    <div class="ai-input-row">
+      <input class="ai-inp" id="aiInp" placeholder="Pergunte sobre os dados…"
+             onkeydown="if(event.key==='Enter')enviarChat()">
+      <button class="ai-send" id="aiSendBtn" onclick="enviarChat()">▶</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   mtzHRF — Doppler WiFi + IA
+   ═══════════════════════════════════════════════════════════════════ */
+
+// ── WebSocket ──────────────────────────────────────────────────────
+let _ws       = null;
+let _dados    = null;
+let _histResp = new Array(200).fill(0);
+let _histCard = new Array(200).fill(0);
+let _tResp    = 0;
+let _tCard    = 0;
+
+function conectar() {
+  _ws = new WebSocket(`ws://${location.host}/ws`);
+  if (window.srfNav) { _ws.onopen = () => srfNav.setWs(true); }
+  _ws.onclose = () => { if (window.srfNav) srfNav.setWs(false); setTimeout(conectar, 2000); };
+  _ws.onmessage = ev => {
+    try { _dados = JSON.parse(ev.data); atualizar(_dados); } catch {}
+  };
+}
+conectar();
+
+// ── Atualização dos dados ──────────────────────────────────────────
+function atualizar(d) {
+  // Presença
+  const pres = d.presenca || {};
+  const det  = pres.detectado;
+  const atv  = pres.atividade || '';
+  const conf = pres.confianca || 0;
+  const mov  = atv === 'se movendo' || atv === 'muito ativo';
+
+  const st = document.getElementById('presStatus');
+  const pill = document.getElementById('pillPresenca');
+  if (det) {
+    st.textContent  = mov ? 'EM MOVIMENTO' : 'PRESENTE';
+    st.className    = mov ? 'mov' : 'det';
+    pill.textContent = mov ? 'MOVIMENTO' : 'PRESENTE';
+    pill.className   = 'pill on';
+  } else {
+    st.textContent = 'AMBIENTE VAZIO';
+    st.className   = '';
+    pill.textContent = 'VAZIO';
+    pill.className   = 'pill';
+  }
+  document.getElementById('presConf').textContent =
+    `confiança ${Math.round(conf * 100)}% · ${atv || 'parado'}`;
+
+  // Stats
+  document.getElementById('stRssi').textContent = d.rssi != null ? d.rssi + ' dBm' : '— dBm';
+  document.getElementById('stVar').textContent  = d.variancia != null ? d.variancia.toFixed(3) : '—';
+  document.getElementById('stAtv').textContent  = (atv || '—').toUpperCase();
+
+  // Respiração
+  const resp = d.respiracao || {};
+  document.getElementById('respBpm').textContent  = resp.bpm > 0 ? resp.bpm.toFixed(1) : '—';
+  document.getElementById('respConf').textContent = resp.bpm > 0
+    ? `confiança: ${Math.round((resp.confianca || 0) * 100)}%` : 'sem leitura';
+  document.getElementById('stFonte').textContent  = (resp.fonte || '—').toUpperCase();
+
+  // Batimentos
+  const card = d.batimentos || {};
+  document.getElementById('cardBpm').textContent  = card.bpm > 0 ? card.bpm.toFixed(0) : '—';
+  document.getElementById('cardConf').textContent = card.bpm > 0
+    ? `confiança: ${Math.round((card.confianca || 0) * 100)}%` : 'sem leitura';
+
+  // Buffers de histórico
+  _histResp.push(resp.bpm || 0); _histResp.shift();
+  _histCard.push(card.bpm || 0); _histCard.shift();
+}
+
+// ── Canvas: Radar Doppler ──────────────────────────────────────────
+const RC = document.getElementById('radarCanvas');
+const RX = RC.getContext('2d');
+let _t = 0;
+let _blipTheta = 0;
+
+function redimensionar() {
+  const wrap = RC.parentElement;
+  RC.width  = wrap.clientWidth;
+  RC.height = wrap.clientHeight;
+}
+redimensionar();
+window.addEventListener('resize', redimensionar);
+
+function desenharRadar() {
+  const W = RC.width, H = RC.height;
+  const cx = W / 2, cy = H / 2 + 20;
+  const R  = Math.min(W, H) * 0.38;
+  _t += 0.016;
+
+  // Fade trail
+  RX.fillStyle = 'rgba(0,0,0,0.08)';
+  RX.fillRect(0, 0, W, H);
+
+  // Anéis
+  [0.33, 0.66, 1].forEach(f => {
+    RX.beginPath();
+    RX.arc(cx, cy, R * f, 0, Math.PI * 2);
+    RX.strokeStyle = `rgba(71,223,127,${0.06 + f * 0.04})`;
+    RX.lineWidth = .5;
+    RX.stroke();
+  });
+
+  // Cruz
+  RX.strokeStyle = 'rgba(71,223,127,0.06)';
+  RX.lineWidth   = .4;
+  [[cx, cy - R, cx, cy + R], [cx - R, cy, cx + R, cy]].forEach(([x1, y1, x2, y2]) => {
+    RX.beginPath(); RX.moveTo(x1, y1); RX.lineTo(x2, y2); RX.stroke();
+  });
+
+  // Varredura giratória
+  const sweepAngle = (_t * 0.6) % (Math.PI * 2);
+  for (let da = 0; da > -0.8; da -= 0.04) {
+    const a     = sweepAngle + da;
+    const alpha = ((da + 0.8) / 0.8) * 0.12;
+    RX.beginPath();
+    RX.moveTo(cx, cy);
+    RX.arc(cx, cy, R, a, a + 0.04);
+    RX.fillStyle = `rgba(71,223,127,${alpha})`;
+    RX.fill();
+  }
+  RX.beginPath();
+  RX.moveTo(cx, cy);
+  RX.lineTo(cx + Math.cos(sweepAngle) * R, cy + Math.sin(sweepAngle) * R);
+  const grd = RX.createLinearGradient(cx, cy,
+    cx + Math.cos(sweepAngle) * R, cy + Math.sin(sweepAngle) * R);
+  grd.addColorStop(0, 'rgba(71,223,127,.7)');
+  grd.addColorStop(1, 'rgba(71,223,127,0)');
+  RX.strokeStyle = grd; RX.lineWidth = 1.5; RX.stroke();
+
+  // Antena central
+  const topY = cy - 28;
+  const grdMast = RX.createLinearGradient(cx, topY, cx, cy);
+  grdMast.addColorStop(0, 'rgba(71,223,127,.9)');
+  grdMast.addColorStop(1, 'rgba(71,223,127,.2)');
+  RX.beginPath(); RX.moveTo(cx, cy); RX.lineTo(cx, topY);
+  RX.strokeStyle = grdMast; RX.lineWidth = 2; RX.stroke();
+
+  const p = 0.7 + 0.3 * Math.sin(_t * 3);
+  const grdTop = RX.createRadialGradient(cx, topY, 0, cx, topY, 14 * p);
+  grdTop.addColorStop(0, `rgba(71,223,127,${.9 * p})`);
+  grdTop.addColorStop(1, 'rgba(71,223,127,0)');
+  RX.beginPath(); RX.arc(cx, topY, 14 * p, 0, Math.PI * 2);
+  RX.fillStyle = grdTop; RX.fill();
+
+  // Blip de presença
+  if (_dados?.presenca?.detectado) {
+    _blipTheta += 0.025;
+    const br = R * 0.55;
+    const bx = cx + Math.cos(_blipTheta) * br;
+    const by = cy + Math.sin(_blipTheta) * br;
+    const bp = 0.5 + 0.5 * Math.sin(_t * 3.5);
+    const bgd = RX.createRadialGradient(bx, by, 0, bx, by, 10 * bp);
+    const mov = _dados?.presenca?.atividade === 'se movendo';
+    const cor = mov ? '245,216,0' : '71,223,127';
+    bgd.addColorStop(0, `rgba(${cor},.9)`);
+    bgd.addColorStop(1, `rgba(${cor},0)`);
+    RX.beginPath(); RX.arc(bx, by, 10 * bp, 0, Math.PI * 2);
+    RX.fillStyle = bgd; RX.fill();
+  }
+
+  // Anel de variância
+  if (_dados?.variancia > 0.05) {
+    const v    = Math.min(1, _dados.variancia / 2);
+    const rVar = R * (0.7 + v * 0.25);
+    const segs = 60;
+    RX.lineWidth = 1;
+    for (let i = 0; i < segs; i++) {
+      const a  = (i / segs) * Math.PI * 2;
+      const n  = 0.9 + 0.1 * Math.sin(_t * 2 + i * 0.4) * v * 3;
+      const a2 = ((i + 1) / segs) * Math.PI * 2;
+      const n2 = 0.9 + 0.1 * Math.sin(_t * 2 + (i + 1) * 0.4) * v * 3;
+      RX.beginPath();
+      RX.moveTo(cx + Math.cos(a) * rVar * n, cy + Math.sin(a) * rVar * n);
+      RX.lineTo(cx + Math.cos(a2) * rVar * n2, cy + Math.sin(a2) * rVar * n2);
+      const al = v * 0.3 * (0.5 + 0.5 * Math.sin(_t + i * 0.3));
+      RX.strokeStyle = `rgba(245,216,0,${al})`;
+      RX.stroke();
+    }
+  }
+
+  // Labels dos anéis
+  RX.fillStyle = 'rgba(71,223,127,0.25)';
+  RX.font = '9px JetBrains Mono,monospace';
+  RX.textAlign = 'left';
+  [[R * 0.33, '2m'], [R * 0.66, '5m'], [R, '10m']].forEach(([r, lbl]) => {
+    RX.fillText(lbl, cx + r + 3, cy - 3);
+  });
+}
+
+// ── Canvas: Respiração ─────────────────────────────────────────────
+const respC = document.getElementById('respCanvas');
+const respX = respC.getContext('2d');
+
+function desenharResp() {
+  const W = respC.width = respC.offsetWidth;
+  const H = respC.height;
+  respX.clearRect(0, 0, W, H);
+  const bpm  = _dados?.respiracao?.bpm || 0;
+  const conf = _dados?.respiracao?.confianca || 0;
+  if (bpm <= 0) { _linhaBase(respX, W, H, 'rgba(71,223,127,.1)'); return; }
+  _tResp += 0.016 * (bpm / 60) * 2;
+  const amp = (H / 2 - 4) * Math.min(1, conf * 1.5 + 0.2);
+  respX.beginPath();
+  for (let x = 0; x <= W; x++) {
+    const y = H / 2 - amp * Math.sin(Math.PI * 2 * (_tResp + x / W * 2));
+    x === 0 ? respX.moveTo(x, y) : respX.lineTo(x, y);
+  }
+  respX.strokeStyle = '#47DF7F'; respX.lineWidth = 1.8;
+  respX.shadowColor = '#47DF7F'; respX.shadowBlur = 6;
+  respX.stroke(); respX.shadowBlur = 0;
+}
+
+// ── Canvas: Batimentos ECG ─────────────────────────────────────────
+const cardC = document.getElementById('cardCanvas');
+const cardX = cardC.getContext('2d');
+
+function ecg(f) {
+  if (f < 0.08)  return 0.4 * Math.sin((f / 0.08) * Math.PI);
+  if (f < 0.14)  return -0.15;
+  if (f < 0.17)  return 3.5 * Math.sin(((f - 0.14) / 0.03) * Math.PI);
+  if (f < 0.22)  return -0.35 * Math.sin(((f - 0.17) / 0.05) * Math.PI);
+  if (f < 0.48)  return 0.55 * Math.sin(((f - 0.22) / 0.26) * Math.PI);
+  return 0;
+}
+
+function desenharCard() {
+  const W = cardC.width = cardC.offsetWidth;
+  const H = cardC.height;
+  cardX.clearRect(0, 0, W, H);
+  const bpm  = _dados?.batimentos?.bpm || 0;
+  const conf = _dados?.batimentos?.confianca || 0;
+  if (bpm <= 0) { _linhaBase(cardX, W, H, 'rgba(255,59,48,.1)'); return; }
+  _tCard += 0.016 * (bpm / 60) * 1.8;
+  const esc = (H / 2 - 4) * 0.38 * Math.min(1, conf * 2.5 + 0.2);
+  cardX.beginPath();
+  for (let x = 0; x <= W; x++) {
+    const y = H / 2 - esc * ecg((_tCard + (x / W) * 3) * (bpm / 60) % 1);
+    x === 0 ? cardX.moveTo(x, y) : cardX.lineTo(x, y);
+  }
+  cardX.strokeStyle = '#FF3B30'; cardX.lineWidth = 1.8;
+  cardX.shadowColor = '#FF3B30'; cardX.shadowBlur = 6;
+  cardX.stroke(); cardX.shadowBlur = 0;
+}
+
+function _linhaBase(ctx, W, H, cor) {
+  ctx.strokeStyle = cor; ctx.lineWidth = 1;
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ── Loop de animação ───────────────────────────────────────────────
+function animar() {
+  requestAnimationFrame(animar);
+  desenharRadar();
+  desenharResp();
+  desenharCard();
+}
+animar();
+
+// ── IA: Inicializar ────────────────────────────────────────────────
+let _aiHistorico = [];
+let _chatModelo  = null;
+let _autoInterval = null;
+
+async function iniciarAI() {
+  try {
+    const st = await fetch('/api/llm/status').then(r => r.json()).catch(() => ({}));
+    const dot = document.getElementById('aiDot');
+    const lbl = document.getElementById('aiModelLbl');
+
+    if (st.chat_pronto) {
+      _chatModelo = st.chat_model;
+      dot.classList.add('on');
+      lbl.textContent = st.chat_model.split(':')[0];
+      // Análise automática a cada 30s
+      _autoInterval = setInterval(solicitarAnalise, 30_000);
+      setTimeout(solicitarAnalise, 2000); // análise inicial
+    } else if (st.embed_model) {
+      lbl.textContent = 'só embedding';
+      document.getElementById('aiInsight').textContent =
+        'Instale um modelo de chat: ollama pull qwen2.5:3b';
+      document.getElementById('aiInsight').classList.remove('analisando');
+      // Análise por template
+      _autoInterval = setInterval(analiseTemplate, 5000);
+    } else {
+      lbl.textContent = 'offline';
+      document.getElementById('aiInsight').textContent =
+        'Ollama não encontrado. Instale em ollama.ai';
+    }
+  } catch {}
+}
+iniciarAI();
+
+// ── IA: Análise Automática (LLM) ───────────────────────────────────
+async function solicitarAnalise() {
+  if (!_dados) return;
+  const el = document.getElementById('aiInsight');
+  el.textContent = 'Analisando…';
+  el.className   = 'ai-insight analisando';
+
+  const prompt = `Analise estes dados de Doppler WiFi em tempo real e dê um insight conciso (2-3 frases):
+Presença: ${_dados.presenca?.detectado ? 'SIM' : 'NÃO'} (${_dados.presenca?.atividade || '—'}, confiança ${Math.round((_dados.presenca?.confianca || 0) * 100)}%)
+Respiração: ${_dados.respiracao?.bpm > 0 ? _dados.respiracao.bpm.toFixed(1) + ' bpm (confiança ' + Math.round((_dados.respiracao?.confianca || 0) * 100) + '%)' : 'não detectada'}
+Batimentos: ${_dados.batimentos?.bpm > 0 ? _dados.batimentos.bpm.toFixed(0) + ' bpm (confiança ' + Math.round((_dados.batimentos?.confianca || 0) * 100) + '%)' : 'não detectado'}
+RSSI WiFi: ${_dados.rssi} dBm | Variância: ${_dados.variancia?.toFixed(3)}
+Interprete os dados, destaque o que está normal ou anormal. Seja direto.`;
+
+  try {
+    const r = await fetch('/api/llm/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mensagem: prompt, historico: [] }),
+    });
+    const d = await r.json();
+    el.textContent = d.resposta || 'Sem resposta';
+    el.className   = 'ai-insight';
+
+    // Alertas automáticos
+    if (d.resposta) verificarAlertas(d.resposta);
+  } catch {
+    el.textContent = 'LLM indisponível.';
+    analiseTemplate();
+  }
+}
+
+// ── IA: Análise por template (fallback sem LLM de chat) ────────────
+function analiseTemplate() {
+  if (!_dados) return;
+  const el  = document.getElementById('aiInsight');
+  const det = _dados.presenca?.detectado;
+  const atv = _dados.presenca?.atividade || '';
+  const rBpm = _dados.respiracao?.bpm || 0;
+  const cBpm = _dados.batimentos?.bpm || 0;
+  const rConf = (_dados.respiracao?.confianca || 0) * 100;
+  const cConf = (_dados.batimentos?.confianca || 0) * 100;
+
+  let txt = '';
+  if (!det) {
+    txt = '🏠 Ambiente vazio. Nenhuma presença detectada pela variação de RSSI WiFi.';
+  } else {
+    txt = `👤 Presença detectada (${Math.round((_dados.presenca?.confianca || 0) * 100)}% confiança)`;
+    if (atv === 'muito ativo')     txt += ' — muito movimento.';
+    else if (atv === 'se movendo') txt += ' — em movimento.';
+    else                           txt += ' — parado.';
+
+    if (rBpm > 0)
+      txt += ` Respiração: ${rBpm.toFixed(1)} rpm (${Math.round(rConf)}% conf)${rBpm < 12 ? ' — LENTA ⚠' : rBpm > 25 ? ' — RÁPIDA ⚠' : ' — normal ✓'}.`;
+    if (cBpm > 0)
+      txt += ` Batimentos: ${cBpm.toFixed(0)} bpm${cBpm < 50 ? ' — BAIXO ⚠' : cBpm > 100 ? ' — ALTO ⚠' : ' — normal ✓'}.`;
+  }
+
+  el.textContent = txt;
+  el.className   = 'ai-insight';
+}
+
+// ── Alertas ────────────────────────────────────────────────────────
+function verificarAlertas(texto) {
+  const palavras = ['anormal', 'irregular', 'alto', 'baixo', 'preocupante', 'atenção'];
+  if (palavras.some(p => texto.toLowerCase().includes(p))) {
+    adicionarMsg('alerta', '⚠ ' + texto.slice(0, 120) + '…');
+  }
+}
+
+// ── Chat ───────────────────────────────────────────────────────────
+function adicionarMsg(tipo, texto) {
+  const chat = document.getElementById('aiChat');
+  const div  = document.createElement('div');
+  div.className = 'msg ' + tipo;
+  div.textContent = texto;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+async function enviarChat() {
+  const inp = document.getElementById('aiInp');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  inp.value = '';
+
+  adicionarMsg('user', txt);
+  const bot = adicionarMsg('bot', '…');
+  document.getElementById('aiSendBtn').disabled = true;
+
+  _aiHistorico.push({ role: 'user', content: txt });
+
+  // Contexto completo
+  const contextoStr = _dados ? [
+    `Presença: ${_dados.presenca?.detectado ? 'SIM (' + (_dados.presenca?.atividade || '') + ', ' + Math.round((_dados.presenca?.confianca || 0) * 100) + '%)' : 'NÃO'}`,
+    `Respiração: ${_dados.respiracao?.bpm > 0 ? _dados.respiracao.bpm.toFixed(1) + ' bpm' : 'não detectada'}`,
+    `Batimentos: ${_dados.batimentos?.bpm > 0 ? _dados.batimentos.bpm.toFixed(0) + ' bpm' : 'não detectado'}`,
+    `RSSI: ${_dados.rssi} dBm | Variância: ${(_dados.variancia || 0).toFixed(3)}`,
+  ].join('\n') : 'Sem dados disponíveis';
+
+  const mensagemComContexto = `[Dados Doppler WiFi em tempo real]\n${contextoStr}\n\nPergunta: ${txt}`;
+
+  try {
+    const r = await fetch('/api/llm/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mensagem: mensagemComContexto,
+        historico: _aiHistorico.slice(-6),
+      }),
+    });
+    const d = await r.json();
+    const resp = d.resposta || d.erro || 'Sem resposta';
+    bot.textContent = resp;
+    _aiHistorico.push({ role: 'assistant', content: resp });
+  } catch (e) {
+    bot.textContent = 'Erro: ' + e.message;
+    bot.style.color = 'var(--r)';
+  }
+
+  document.getElementById('aiSendBtn').disabled = false;
+}
+
+function pergunta(txt) {
+  document.getElementById('aiInp').value = txt;
+  enviarChat();
+}
+
+// Atualizar análise template quando sem LLM
+setInterval(() => { if (!_chatModelo) analiseTemplate(); }, 3000);
+</script>
+</body>
+</html>
