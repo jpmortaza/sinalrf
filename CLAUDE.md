@@ -1,5 +1,7 @@
 # CLAUDE.md — SinalRF / HackRF Platform
 
+**GitHub:** https://github.com/jpmortaza/sinalrf
+
 Plataforma de sensoriamento RF em tempo real usando HackRF One.
 Backend Python + FastAPI. Frontend HTML/JS puro. WebSocket para streaming de dados.
 
