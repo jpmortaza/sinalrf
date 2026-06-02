@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINALRF // 3D RF ENVIRONMENT</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+  html, body { height: 100vh; overflow: hidden; }
+  #srf-nav { position: fixed; top: 0; left: 0; right: 0; }
+
+  /* CANVAS */
+  #scene { position:fixed; top:40px; left:0; right:0; bottom:0; cursor:grab; }
+  #scene:active { cursor:grabbing; }
+
+  /* HUD overlays */
+  .hud { position:fixed; z-index:50; font-family:var(--font); pointer-events:none; }
+
+  /* top-left: title + status */
+  .hud-tl { top:52px; left:12px; display:flex; flex-direction:column; gap:6px; }
+  .hud-title { font-size:14px; font-weight:700; color:var(--g); text-shadow:var(--glow-g);
+    letter-spacing:2px; }
+  .hud-sub { font-size:9px; color:var(--g3); letter-spacing:1px; }
+  .hud-stats { display:flex; flex-direction:column; gap:3px; margin-top:4px; }
+  .hud-stat { display:flex; gap:8px; align-items:center; font-size:10px; }
+  .hud-label { color:var(--g3); min-width:90px; letter-spacing:.5px; }
+  .hud-val   { color:var(--g); font-weight:600; font-variant-numeric:tabular-nums; }
+  .hud-val.y { color:var(--y); text-shadow:var(--glow-y); }
+  .hud-val.b { color:var(--b); }
+  .hud-val.r { color:var(--r); }
+
+  /* top-right: legend */
+  .hud-tr { top:52px; right:12px; display:flex; flex-direction:column; gap:4px; }
+  .legend-item { display:flex; align-items:center; gap:7px; font-size:10px; color:var(--g3); }
+  .legend-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .legend-line { width:16px; height:2px; flex-shrink:0; border-radius:1px; }
+
+  /* bottom: controls */
+  .hud-bl { bottom:12px; left:12px; display:flex; flex-direction:column; gap:4px; pointer-events:all; }
+  .ctrl-row { display:flex; gap:6px; }
+  .ctrl-btn { background:rgba(0,0,0,.7); border:1px solid var(--border2); color:var(--g2);
+    font-family:var(--font); font-size:10px; padding:5px 12px; cursor:pointer; letter-spacing:.8px;
+    transition:all .2s; }
+  .ctrl-btn:hover { color:var(--g); border-color:var(--g); background:rgba(71,223,127,.08); }
+  .ctrl-btn.active { color:var(--g); border-color:var(--g); background:rgba(71,223,127,.15); }
+  .ctrl-hint { font-size:9px; color:var(--g3); letter-spacing:.5px; }
+
+  /* bottom-right: detected signals */
+  .hud-br { bottom:12px; right:12px; max-width:260px; max-height:280px;
+    display:flex; flex-direction:column; gap:4px; pointer-events:all; }
+  .sig-title { font-size:9px; letter-spacing:2px; color:var(--g2); font-weight:600;
+    padding-bottom:4px; border-bottom:1px solid var(--border); }
+  .sig-list { display:flex; flex-direction:column; gap:3px; overflow-y:auto; flex:1; }
+  .sig-item { display:flex; align-items:center; gap:6px; font-size:10px; background:rgba(0,0,0,.5);
+    border:1px solid var(--border); padding:3px 7px; }
+  .sig-freq { color:var(--g); font-weight:600; min-width:75px; font-variant-numeric:tabular-nums; }
+  .sig-dbm  { color:var(--y2); min-width:55px; font-variant-numeric:tabular-nums; }
+  .sig-type { color:var(--g3); font-size:9px; }
+  </style>
+</head>
+<body>
+
+<script src="nav.js"></script>
+
+<canvas id="scene"></canvas>
+
+<!-- HUD top-left -->
+<div class="hud hud-tl">
+  <div class="hud-title">AMBIENTE RF 3D</div>
+  <div class="hud-sub">RECONSTRUÇÃO POR RAIOS RF</div>
+  <div class="hud-stats">
+    <div class="hud-stat"><span class="hud-label">RSSI WiFi</span><span class="hud-val b" id="h_rssi">— dBm</span></div>
+    <div class="hud-stat"><span class="hud-label">Variância</span><span class="hud-val y" id="h_var">—</span></div>
+    <div class="hud-stat"><span class="hud-label">Presença</span><span class="hud-val" id="h_pres">—</span></div>
+    <div class="hud-stat"><span class="hud-label">Doppler</span><span class="hud-val" id="h_dop">—</span></div>
+    <div class="hud-stat"><span class="hud-label">Resp. RF</span><span class="hud-val y" id="h_resp">— bpm</span></div>
+    <div class="hud-stat"><span class="hud-label">WiFi CH1</span><span class="hud-val" id="h_ch1">— dBm</span></div>
+    <div class="hud-stat"><span class="hud-label">WiFi CH6</span><span class="hud-val" id="h_ch6">— dBm</span></div>
+    <div class="hud-stat"><span class="hud-label">WiFi CH11</span><span class="hud-val" id="h_ch11">— dBm</span></div>
+    <div class="hud-stat"><span class="hud-label">Sinais FM</span><span class="hud-val" id="h_fm">—</span></div>
+    <div class="hud-stat"><span class="hud-label">Fantasmas</span><span class="hud-val r" id="h_ghost">0</span></div>
+    <div class="hud-stat"><span class="hud-label">Intel</span><span class="hud-val" id="h_intel">—</span></div>
+  </div>
+</div>
+
+<!-- HUD top-right: legend -->
+<div class="hud hud-tr">
+  <div style="font-size:9px;color:var(--g3);letter-spacing:1.5px;margin-bottom:6px">// BANDAS RF</div>
+  <div class="legend-item"><div class="legend-line" style="background:#4FAFFF"></div> FM 88–108 MHz</div>
+  <div class="legend-item"><div class="legend-line" style="background:#00FFCC"></div> VHF 108–300 MHz</div>
+  <div class="legend-item"><div class="legend-line" style="background:#47DF7F"></div> UHF 300–500 MHz</div>
+  <div class="legend-item"><div class="legend-line" style="background:#F5D800"></div> 500–700 MHz</div>
+  <div class="legend-item"><div class="legend-line" style="background:#FF8C33"></div> Celular 700–900 MHz</div>
+  <div class="legend-item"><div class="legend-line" style="background:#FF3B30"></div> Fantasma / Anômalo</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#47DF7F;box-shadow:0 0 6px #47DF7F"></div> HackRF / Antena</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#F5D800"></div> Sinal Intel detectado</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#AF6FFF"></div> Presença Doppler</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4FAFFF;opacity:.7"></div> WiFi 2.4 GHz CH 1/6/11</div>
+
+  <div style="margin-top:12px;font-size:9px;color:var(--g3);letter-spacing:1.5px">// CONTROLES</div>
+  <div style="font-size:10px;color:var(--g3);margin-top:4px;line-height:1.8">
+    Arraste → rotacionar<br>
+    Scroll → zoom<br>
+    Duplo-clique → resetar
+  </div>
+</div>
+
+<!-- HUD bottom-left: controls -->
+<div class="hud hud-bl">
+  <div class="ctrl-row">
+    <button class="ctrl-btn active" id="btnRotate" onclick="toggleRotate()">⟳ ROTAÇÃO AUTO</button>
+    <button class="ctrl-btn" id="btnWire" onclick="toggleWire()">▦ WIREFRAME</button>
+    <button class="ctrl-btn" id="btnParticles" onclick="toggleParticles()">✦ PARTÍCULAS</button>
+  </div>
+  <div class="ctrl-hint">
+    HACKRF ONE · 1 MHz – 6 GHz · SDR · IQ SAMPLING
+  </div>
+</div>
+
+<!-- HUD bottom-right: signal list -->
+<div class="hud hud-br">
+  <div class="sig-title">SINAIS DETECTADOS</div>
+  <div class="sig-list" id="sigList">
+    <div style="font-size:10px;color:var(--g3);padding:4px">aguardando scanner...</div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   SinalRF — 3D RF Environment
+   Pure canvas 3D with perspective projection
+   ═══════════════════════════════════════════════════════════════ */
+
+const CV  = document.getElementById('scene');
+const CTX = CV.getContext('2d');
+
+/* ─── Scene state ──────────────────────────────────────────────── */
+let camTheta = 0.5;          // horizontal rotation
+let camPhi   = 0.45;         // vertical tilt (0=top, PI/2=side)
+let camDist  = 500;          // zoom
+let autoRotate = true;
+let showWire   = false;
+let showParticles = true;
+
+let W = 0, H = 0, CX = 0, CY = 0;
+
+/* ─── Live data ────────────────────────────────────────────────── */
+let liveData = null;
+let intelData = null;
+const rssiHist = new Array(80).fill(-70);
+
+/* ─── Signal rays ──────────────────────────────────────────────── */
+const BANDS = [
+  { name:'FM', min:88, max:108, color:'#4FAFFF', alpha:.85 },
+  { name:'VHF', min:108, max:300, color:'#00FFCC', alpha:.7 },
+  { name:'UHF', min:300, max:500, color:'#47DF7F', alpha:.75 },
+  { name:'MID', min:500, max:700, color:'#F5D800', alpha:.7 },
+  { name:'CEL', min:700, max:900, color:'#FF8C33', alpha:.8 },
+];
+
+function bandColor(mhz) {
+  const b = BANDS.find(b => mhz >= b.min && mhz < b.max);
+  return b ? b.color : '#888';
+}
+
+/* Generate base rays — 3D directions */
+const N_RAYS = 64;
+const rays = [];
+for (let i = 0; i < N_RAYS; i++) {
+  const phi   = Math.acos(1 - 2 * (i + 0.5) / N_RAYS);   // Fibonacci sphere
+  const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+  const sin   = Math.sin(phi);
+  rays.push({
+    dx: sin * Math.cos(theta),
+    dy: Math.cos(phi) * 0.5,   // flatten vertically
+    dz: sin * Math.sin(theta),
+    phase: Math.random() * Math.PI * 2,
+    speed: 0.8 + Math.random() * 0.6,
+    baseLen: 80 + Math.random() * 60,
+    freq: 88 + Math.random() * 812,   // will be replaced by real data
+    dbm: -80 + Math.random() * 40,
+    pulse: 0,
+  });
+}
+
+/* ─── Particles ────────────────────────────────────────────────── */
+const N_PARTS = 120;
+const particles = [];
+for (let i = 0; i < N_PARTS; i++) {
+  particles.push(newParticle());
+}
+function newParticle(src) {
+  const theta = Math.random() * Math.PI * 2;
+  const phi   = Math.random() * Math.PI;
+  const r     = 20 + Math.random() * 200;
+  const sin   = Math.sin(phi);
+  return {
+    x: sin * Math.cos(theta) * r,
+    y: (Math.random() - .5) * 80,
+    z: sin * Math.sin(theta) * r,
+    vx: (Math.random() - .5) * 0.4,
+    vy: (Math.random() - .5) * 0.15,
+    vz: (Math.random() - .5) * 0.4,
+    life: Math.random(),
+    maxLife: 1,
+    size: .5 + Math.random() * 2,
+    alpha: .2 + Math.random() * .5,
+    color: ['#47DF7F','#4FAFFF','#F5D800','#FF8C33','#00FFCC'][Math.floor(Math.random() * 5)],
+  };
+}
+
+/* ─── 3D projection ────────────────────────────────────────────── */
+function project3D(x, y, z) {
+  /* rotate around Y axis by camTheta */
+  const rx = x * Math.cos(camTheta) + z * Math.sin(camTheta);
+  const rz = -x * Math.sin(camTheta) + z * Math.cos(camTheta);
+  /* rotate around X axis by camPhi */
+  const ry = y * Math.cos(camPhi) - rz * Math.sin(camPhi);
+  const rz2= y * Math.sin(camPhi) + rz * Math.cos(camPhi);
+  /* perspective */
+  const fov = camDist;
+  const dep = fov / (fov + rz2 + 300);
+  return {
+    sx: CX + rx * dep * 1.6,
+    sy: CY + ry * dep * 1.2,
+    dep, depth: rz2,
+  };
+}
+
+/* ─── Draw helpers ─────────────────────────────────────────────── */
+function hexAlpha(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/* ─── Grid floor ───────────────────────────────────────────────── */
+function drawGrid() {
+  const STEP = 40, N = 8;
+  CTX.lineWidth = .4;
+  for (let i = -N; i <= N; i++) {
+    /* X lines */
+    const p1 = project3D(i * STEP, 0, -N * STEP);
+    const p2 = project3D(i * STEP, 0,  N * STEP);
+    CTX.beginPath();
+    CTX.moveTo(p1.sx, p1.sy);
+    CTX.lineTo(p2.sx, p2.sy);
+    CTX.strokeStyle = i === 0 ? 'rgba(71,223,127,.25)' : 'rgba(71,223,127,.06)';
+    CTX.stroke();
+    /* Z lines */
+    const q1 = project3D(-N * STEP, 0, i * STEP);
+    const q2 = project3D( N * STEP, 0, i * STEP);
+    CTX.beginPath();
+    CTX.moveTo(q1.sx, q1.sy);
+    CTX.lineTo(q2.sx, q2.sy);
+    CTX.strokeStyle = i === 0 ? 'rgba(71,223,127,.25)' : 'rgba(71,223,127,.06)';
+    CTX.stroke();
+  }
+}
+
+/* ─── Antenna (central HackRF) ─────────────────────────────────── */
+function drawAntenna(t) {
+  /* base disk */
+  const segs = 32;
+  CTX.beginPath();
+  for (let i = 0; i <= segs; i++) {
+    const a  = (i / segs) * Math.PI * 2;
+    const px = Math.cos(a) * 18;
+    const pz = Math.sin(a) * 18;
+    const p  = project3D(px, 0, pz);
+    i === 0 ? CTX.moveTo(p.sx, p.sy) : CTX.lineTo(p.sx, p.sy);
+  }
+  CTX.strokeStyle = 'rgba(71,223,127,.4)';
+  CTX.lineWidth   = 1;
+  CTX.stroke();
+
+  /* vertical mast */
+  const bot = project3D(0, 0, 0);
+  const top = project3D(0, -60, 0);
+  const grd = CTX.createLinearGradient(top.sx, top.sy, bot.sx, bot.sy);
+  grd.addColorStop(0, 'rgba(71,223,127,.9)');
+  grd.addColorStop(1, 'rgba(71,223,127,.2)');
+  CTX.beginPath();
+  CTX.moveTo(bot.sx, bot.sy);
+  CTX.lineTo(top.sx, top.sy);
+  CTX.strokeStyle = grd;
+  CTX.lineWidth   = 2;
+  CTX.stroke();
+
+  /* glow at top */
+  const pulse = 0.7 + 0.3 * Math.sin(t * 3);
+  const gRadius = 8 * pulse;
+  const grd2 = CTX.createRadialGradient(top.sx, top.sy, 0, top.sx, top.sy, gRadius * 3);
+  grd2.addColorStop(0, `rgba(71,223,127,${.9 * pulse})`);
+  grd2.addColorStop(1, 'rgba(71,223,127,0)');
+  CTX.beginPath();
+  CTX.arc(top.sx, top.sy, gRadius * 3, 0, Math.PI * 2);
+  CTX.fillStyle = grd2;
+  CTX.fill();
+
+  /* label */
+  CTX.fillStyle = 'rgba(71,223,127,.7)';
+  CTX.font      = '600 9px JetBrains Mono,monospace';
+  CTX.textAlign = 'center';
+  CTX.fillText('HACKRF ONE', top.sx, top.sy - gRadius * 3 - 4);
+}
+
+/* ─── Signal rays ──────────────────────────────────────────────── */
+function drawRays(t) {
+  const variation = liveData ? Math.min(1, (liveData.variancia || 0) / 4) : 0;
+  const present   = liveData?.presenca?.detectado ? 1 : 0;
+
+  rays.forEach((ray, idx) => {
+    const phase = t * ray.speed + ray.phase;
+    const pulse = 0.6 + 0.4 * Math.sin(phase);
+
+    /* length: base + signal strength + presence effect */
+    const dbBoost = ray.dbm > -60 ? (ray.dbm + 80) / 20 * 60 : 0;
+    const presBoost = present * variation * 40 * (0.5 + 0.5 * Math.sin(phase * 1.7 + idx));
+    const len = (ray.baseLen + dbBoost + presBoost) * pulse;
+
+    const tip = {
+      x: ray.dx * len,
+      y: ray.dy * len,
+      z: ray.dz * len,
+    };
+
+    const p0 = project3D(0, -10, 0);
+    const p1 = project3D(tip.x, tip.y - 10, tip.z);
+    const color = ray.isGhost ? '#FF3B30' : bandColor(ray.freq);
+    const alpha = (hexAlpha(color, .12 + .35 * pulse).match(/[\d.]+/g) || []);
+
+    /* ray line */
+    const grd = CTX.createLinearGradient(p0.sx, p0.sy, p1.sx, p1.sy);
+    grd.addColorStop(0, hexAlpha(color, .5 * pulse));
+    grd.addColorStop(1, hexAlpha(color, 0));
+    CTX.beginPath();
+    CTX.moveTo(p0.sx, p0.sy);
+    CTX.lineTo(p1.sx, p1.sy);
+    CTX.strokeStyle = grd;
+    CTX.lineWidth   = ray.dbm > -50 ? 1.5 : .8;
+    CTX.stroke();
+
+    /* tip dot for strong signals */
+    if (ray.dbm > -55 && pulse > 0.75) {
+      const r = 2 * pulse;
+      const grdDot = CTX.createRadialGradient(p1.sx, p1.sy, 0, p1.sx, p1.sy, r * 3);
+      grdDot.addColorStop(0, hexAlpha(color, .7 * pulse));
+      grdDot.addColorStop(1, hexAlpha(color, 0));
+      CTX.beginPath();
+      CTX.arc(p1.sx, p1.sy, r * 3, 0, Math.PI * 2);
+      CTX.fillStyle = grdDot;
+      CTX.fill();
+    }
+  });
+}
+
+/* ─── Radar sweep ──────────────────────────────────────────────── */
+function drawSweep(t) {
+  const angle = (t * 0.4) % (Math.PI * 2);
+  const R = 220;
+  /* draw sweep arc on floor plane */
+  for (let r = 0; r < R; r += 4) {
+    for (let da = -0.3; da <= 0; da += 0.05) {
+      const a = angle + da;
+      const x = Math.cos(a) * r;
+      const z = Math.sin(a) * r;
+      const p = project3D(x, 0, z);
+      const alpha = (da + 0.3) / 0.3 * (1 - r / R) * 0.18;
+      CTX.fillStyle = `rgba(71,223,127,${alpha})`;
+      CTX.fillRect(p.sx - .5, p.sy - .5, 1, 1);
+    }
+  }
+  /* sweep line */
+  const pEnd = project3D(Math.cos(angle) * R, 0, Math.sin(angle) * R);
+  const pCtr = project3D(0, 0, 0);
+  const grd  = CTX.createLinearGradient(pCtr.sx, pCtr.sy, pEnd.sx, pEnd.sy);
+  grd.addColorStop(0, 'rgba(71,223,127,.6)');
+  grd.addColorStop(1, 'rgba(71,223,127,0)');
+  CTX.beginPath();
+  CTX.moveTo(pCtr.sx, pCtr.sy);
+  CTX.lineTo(pEnd.sx, pEnd.sy);
+  CTX.strokeStyle = grd;
+  CTX.lineWidth   = 1.5;
+  CTX.stroke();
+}
+
+/* ─── Doppler bubble (presença corporal) ───────────────────────── */
+function drawDopplerBubble(t) {
+  const dop = liveData?.hackrf?.doppler;
+  if (!dop) return;
+  const presente = dop.presente;
+  const varDop   = Math.min(1, (dop.variancia || 0) / 4);
+  if (!presente && varDop < 0.05) return;
+
+  const bpm     = dop.resp_bpm || 16;
+  const breathF = (bpm / 60) * 2 * Math.PI;
+  const breathPulse = 0.5 + 0.5 * Math.sin(t * breathF);
+  const R = 160 + varDop * 60 + breathPulse * 20;
+  const segs = 64;
+  CTX.lineWidth = 1.2;
+  for (let i = 0; i < segs; i++) {
+    const a   = (i / segs) * Math.PI * 2;
+    const a2  = ((i + 1) / segs) * Math.PI * 2;
+    const n1  = 0.85 + 0.15 * Math.sin(t * 1.3 + i * 0.4) * varDop * 2;
+    const n2  = 0.85 + 0.15 * Math.sin(t * 1.3 + (i+1) * 0.4) * varDop * 2;
+    const r1  = R * n1;
+    const r2  = R * n2;
+    const h1  = -30 + Math.sin(t * 0.8 + i * 0.2) * varDop * 25;
+    const p1  = project3D(Math.cos(a) * r1, h1, Math.sin(a) * r1);
+    const p2  = project3D(Math.cos(a2) * r2, h1, Math.sin(a2) * r2);
+    const alpha = varDop * 0.35 * (0.4 + 0.6 * breathPulse) * (presente ? 1 : 0.3);
+    CTX.strokeStyle = presente
+      ? `rgba(175,111,255,${alpha})`
+      : `rgba(79,175,255,${alpha})`;
+    CTX.beginPath(); CTX.moveTo(p1.sx, p1.sy); CTX.lineTo(p2.sx, p2.sy);
+    CTX.stroke();
+  }
+}
+
+/* ─── WiFi 2.4GHz channel pillars ─────────────────────────────── */
+function drawWiFiPillars(t) {
+  const canais = liveData?.hackrf?.canais;
+  if (!canais) return;
+  const CFG = [
+    { ch: '1',  angle: Math.PI * 0.8, color: '#4FAFFF' },
+    { ch: '6',  angle: Math.PI * 1.3, color: '#00FFCC' },
+    { ch: '11', angle: Math.PI * 1.8, color: '#4FAFFF' },
+  ];
+  CFG.forEach(({ ch, angle, color }) => {
+    const info = canais[ch];
+    if (!info) return;
+    const dbm = info.potencia_dbm || -90;
+    const pct = Math.max(0, Math.min(1, (dbm + 100) / 50));
+    const h   = pct * 80 + 5;
+    const r   = 260;
+    const x   = Math.cos(angle) * r;
+    const z   = Math.sin(angle) * r;
+    const pulse = 0.8 + 0.2 * Math.sin(t * 1.5 + parseInt(ch));
+
+    /* pillar base → top */
+    const bot = project3D(x, 0, z);
+    const top = project3D(x, -h, z);
+    const grd = CTX.createLinearGradient(top.sx, top.sy, bot.sx, bot.sy);
+    grd.addColorStop(0, hexAlpha(color, .8 * pulse));
+    grd.addColorStop(1, hexAlpha(color, .1));
+    CTX.beginPath(); CTX.moveTo(bot.sx, bot.sy); CTX.lineTo(top.sx, top.sy);
+    CTX.strokeStyle = grd; CTX.lineWidth = 3 * pct + 1; CTX.stroke();
+
+    /* top glow */
+    const grd2 = CTX.createRadialGradient(top.sx, top.sy, 0, top.sx, top.sy, 8 * pulse);
+    grd2.addColorStop(0, hexAlpha(color, .7 * pulse));
+    grd2.addColorStop(1, hexAlpha(color, 0));
+    CTX.beginPath(); CTX.arc(top.sx, top.sy, 8 * pulse, 0, Math.PI * 2);
+    CTX.fillStyle = grd2; CTX.fill();
+
+    /* label */
+    CTX.fillStyle = hexAlpha(color, .6);
+    CTX.font = '600 9px JetBrains Mono,monospace';
+    CTX.textAlign = 'center';
+    CTX.fillText(`CH${ch} ${dbm.toFixed(0)}`, top.sx, top.sy - 12);
+  });
+}
+
+/* ─── Intel signal pillars ─────────────────────────────────────── */
+function drawSignalPillars(t) {
+  if (!intelData?.sinais) return;
+  const sinais = intelData.sinais.filter(s => s.dbm > -85).slice(0, 40);
+  sinais.forEach((sig, i) => {
+    const fMhz  = sig.freq_mhz || 0;
+    /* map frequency to angle: 88MHz=0, 6000MHz=2π */
+    const angle = ((fMhz - 88) / (6000 - 88)) * Math.PI * 2;
+    const r     = 180 + Math.pow(sig.persistencia || 0, .5) * 40;
+    const x     = Math.cos(angle) * r;
+    const z     = Math.sin(angle) * r;
+    const dbNorm= Math.max(0, Math.min(1, (sig.dbm + 100) / 50));
+    const h     = dbNorm * 70 + 5;
+    const color = sig.cor || '#47DF7F';
+    const pulse = 0.75 + 0.25 * Math.sin(t * 0.8 + i * 0.4);
+
+    const bot = project3D(x, 0, z);
+    const top = project3D(x, -h, z);
+    const grd = CTX.createLinearGradient(top.sx, top.sy, bot.sx, bot.sy);
+    grd.addColorStop(0, hexAlpha(color, .7 * pulse));
+    grd.addColorStop(1, hexAlpha(color, .05));
+    CTX.beginPath(); CTX.moveTo(bot.sx, bot.sy); CTX.lineTo(top.sx, top.sy);
+    CTX.strokeStyle = grd;
+    CTX.lineWidth   = Math.max(0.5, (sig.persistencia || 0) * 2 * dbNorm);
+    CTX.stroke();
+
+    if (dbNorm > 0.5) {
+      const grd2 = CTX.createRadialGradient(top.sx, top.sy, 0, top.sx, top.sy, 5 * pulse);
+      grd2.addColorStop(0, hexAlpha(color, .6 * pulse));
+      grd2.addColorStop(1, hexAlpha(color, 0));
+      CTX.beginPath(); CTX.arc(top.sx, top.sy, 5 * pulse, 0, Math.PI * 2);
+      CTX.fillStyle = grd2; CTX.fill();
+    }
+  });
+}
+
+/* ─── FM spheres + ghost signals (CORRECTED field names) ───────── */
+function drawSignalSpheres(t) {
+  /* FM: use espectro.fm (correct field from server) */
+  const fm = liveData?.espectro?.fm || [];
+  fm.slice(0, 12).forEach((sig, i) => {
+    const a = (i / Math.max(fm.length, 1)) * Math.PI * 2;
+    const r = 140;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    const dbNorm = Math.max(0, Math.min(1, ((sig.dbm || -80) + 100) / 40));
+    const y  = -20 - dbNorm * 60;
+    const p  = project3D(x, y, z);
+    const pulse = 0.7 + 0.3 * Math.sin(t * 2 + i);
+    const rad   = (4 + dbNorm * 6) * pulse;
+    const grd   = CTX.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, rad * 2);
+    grd.addColorStop(0, `rgba(79,175,255,${.9 * pulse})`);
+    grd.addColorStop(1, 'rgba(79,175,255,0)');
+    CTX.beginPath(); CTX.arc(p.sx, p.sy, rad * 2, 0, Math.PI * 2);
+    CTX.fillStyle = grd; CTX.fill();
+    CTX.fillStyle = 'rgba(79,175,255,.8)';
+    CTX.font = '600 9px JetBrains Mono,monospace';
+    CTX.textAlign = 'center';
+    const label = sig.nome ? `${sig.freq_mhz}` : `${sig.freq_mhz}`;
+    CTX.fillText(label, p.sx, p.sy - rad * 2 - 3);
+  });
+
+  /* Ghosts: use espectro.anomalos (correct field from server) */
+  const ghosts = liveData?.espectro?.anomalos || [];
+  ghosts.slice(0, 8).forEach((sig, i) => {
+    const a = (i / Math.max(ghosts.length, 1)) * Math.PI * 2 + Math.PI;
+    const r = 100;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    const p  = project3D(x, -50, z);
+    const pulse = 0.5 + 0.5 * Math.sin(t * 4 + i * 1.3);
+    CTX.fillStyle = `rgba(255,59,48,${.7 * pulse})`;
+    CTX.beginPath(); CTX.arc(p.sx, p.sy, 3 * pulse, 0, Math.PI * 2); CTX.fill();
+    CTX.fillStyle = `rgba(255,59,48,${.5 * pulse})`;
+    CTX.font = '9px JetBrains Mono,monospace'; CTX.textAlign = 'center';
+    CTX.fillText(`${(sig.freq_mhz || 0).toFixed(0)} MHz`, p.sx, p.sy - 6);
+  });
+}
+
+/* ─── Particles ────────────────────────────────────────────────── */
+function updateDrawParticles(t) {
+  if (!showParticles) return;
+  const variation = liveData ? Math.min(3, liveData.variancia || 0) : 0;
+  const turbulence = 1 + variation * 3;
+
+  particles.forEach((p, i) => {
+    p.x += p.vx * turbulence;
+    p.y += p.vy * turbulence;
+    p.z += p.vz * turbulence;
+    p.life -= 0.003 + variation * 0.005;
+    if (p.life <= 0) { particles[i] = newParticle(); return; }
+
+    const proj = project3D(p.x, p.y, p.z);
+    const a    = p.alpha * p.life * p.maxLife;
+    const sz   = p.size * p.life;
+    CTX.fillStyle = hexAlpha(p.color, a);
+    CTX.beginPath();
+    CTX.arc(proj.sx, proj.sy, sz, 0, Math.PI * 2);
+    CTX.fill();
+  });
+}
+
+/* ─── RSSI ring (presence indicator) ──────────────────────────── */
+function drawPresenceRing(t) {
+  if (!liveData) return;
+  const variation = Math.min(1, (liveData.variancia || 0) / 2);
+  const present   = liveData.presenca?.detectado;
+  if (!present && variation < 0.1) return;
+
+  const segs = 48;
+  const R    = 200;
+  CTX.lineWidth = 1;
+  for (let i = 0; i < segs; i++) {
+    const a  = (i / segs) * Math.PI * 2;
+    const a2 = ((i + 1) / segs) * Math.PI * 2;
+    const noise = 0.8 + 0.2 * Math.sin(t * 2 + i * 0.5) * variation * 3;
+    const r1 = R * noise;
+    const r2 = R * (0.8 + 0.2 * Math.sin(t * 2 + (i + 1) * 0.5) * variation * 3);
+    const p1 = project3D(Math.cos(a) * r1, 0, Math.sin(a) * r1);
+    const p2 = project3D(Math.cos(a2) * r2, 0, Math.sin(a2) * r2);
+    const alpha = variation * 0.4 * (0.5 + 0.5 * Math.sin(t + i * 0.3));
+    CTX.strokeStyle = present
+      ? `rgba(245,216,0,${alpha})`
+      : `rgba(71,223,127,${alpha * 0.4})`;
+    CTX.beginPath();
+    CTX.moveTo(p1.sx, p1.sy);
+    CTX.lineTo(p2.sx, p2.sy);
+    CTX.stroke();
+  }
+}
+
+/* ─── Main render loop ─────────────────────────────────────────── */
+let t0 = performance.now();
+let lastT = 0;
+let _paused = false;
+
+function render(now) {
+  requestAnimationFrame(render); // always reschedule first — even if we throw below
+  if (_paused) return;
+
+  try {
+    const t = (now - t0) / 1000;
+    const dt = Math.min(t - lastT, 0.1); // clamp dt: prevents huge jump after tab return
+    lastT = t;
+
+    /* resize */
+    if (CV.width !== window.innerWidth || CV.height !== window.innerHeight - 40) {
+      CV.width  = window.innerWidth;
+      CV.height = window.innerHeight - 40;
+      W = CV.width; H = CV.height; CX = W / 2; CY = H / 2;
+    }
+
+    if (autoRotate) camTheta += dt * 0.12;
+
+    /* clear */
+    CTX.fillStyle = 'rgba(0,0,0,0.18)';
+    CTX.fillRect(0, 0, W, H);
+
+    /* layers back to front */
+    drawGrid();
+    drawPresenceRing(t);
+    drawDopplerBubble(t);
+    drawSweep(t);
+    drawSignalPillars(t);
+    drawWiFiPillars(t);
+    updateDrawParticles(t);
+    drawRays(t);
+    drawSignalSpheres(t);
+    drawAntenna(t);
+  } catch (_) {}
+}
+requestAnimationFrame(render);
+
+/* ─── Reset timing on tab return so animation resumes smoothly ─── */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    // re-anchor t0 so t keeps counting from lastT (no huge dt spike)
+    t0 = performance.now() - lastT * 1000;
+    // full clear: flush the accumulated semi-transparent fills
+    if (W > 0 && H > 0) CTX.clearRect(0, 0, W, H);
+  }
+});
+
+/* ─── WebSocket — main data ────────────────────────────────────── */
+function connectWS() {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen  = () => { if (window.srfNav) window.srfNav.setWs(true); };
+  ws.onclose = () => {
+    if (window.srfNav) window.srfNav.setWs(false);
+    setTimeout(connectWS, 2000);
+  };
+  ws.onmessage = ev => {
+    try {
+      liveData = JSON.parse(ev.data);
+      updateHUD(liveData);
+      updateRaysFromData(liveData);
+    } catch (_) {}
+  };
+}
+connectWS();
+
+/* ─── WebSocket — intel ────────────────────────────────────────── */
+function connectIntel() {
+  const ws = new WebSocket(`ws://${location.host}/ws/intel`);
+  ws.onclose = () => setTimeout(connectIntel, 3000);
+  ws.onmessage = ev => {
+    try {
+      intelData = JSON.parse(ev.data);
+      updateSignalList(intelData);
+    } catch (_) {}
+  };
+}
+connectIntel();
+
+/* ─── Update rays from real data ────────────────────────────────── */
+function updateRaysFromData(f) {
+  const esp = f.espectro || {};
+  const freqs = esp.freqs || [];
+  const dbs   = esp.dbs   || [];
+
+  if (freqs.length > 0) {
+    /* distribute rays across detected frequencies */
+    rays.forEach((ray, i) => {
+      const idx = Math.floor(i * freqs.length / N_RAYS);
+      if (freqs[idx] != null) {
+        ray.freq = freqs[idx] / 1e6;
+        ray.dbm  = dbs[idx] || -80;
+      }
+    });
+  }
+
+  /* mark ghost rays */
+  const ghosts = (esp.anomalos || []).map(g => g.freq);
+  rays.forEach(ray => {
+    ray.isGhost = ghosts.some(gf => Math.abs((gf || 0) / 1e6 - ray.freq) < 3);
+  });
+
+  /* add turbulence based on RSSI variation */
+  rssiHist.push(f.rssi || -70); rssiHist.shift();
+}
+
+/* ─── Update HUD ────────────────────────────────────────────────── */
+function updateHUD(f) {
+  const $ = id => document.getElementById(id);
+  $('h_rssi').textContent = f.rssi != null ? f.rssi + ' dBm' : '—';
+  $('h_var').textContent  = f.variancia != null ? f.variancia.toFixed(3) : '—';
+
+  /* Presença WiFi */
+  const det = f.presenca?.detectado;
+  const pEl = $('h_pres');
+  pEl.textContent = det ? (f.presenca?.atividade?.toUpperCase() || 'DETECTADO') : 'VAZIO';
+  pEl.className   = 'hud-val' + (det ? ' y' : '');
+
+  /* Doppler corporal — usa campos corretos */
+  const dop = f.hackrf?.doppler;
+  if (dop) {
+    const dEl = $('h_dop');
+    dEl.textContent = dop.presente ? 'PRESENTE' : 'AUSENTE';
+    dEl.className   = 'hud-val' + (dop.presente ? ' y' : '');
+    $('h_resp').textContent = dop.resp_bpm > 0
+      ? `${dop.resp_bpm} bpm (${Math.round(dop.confianca * 100)}%)`
+      : '— bpm';
+  }
+
+  /* WiFi canais */
+  const canais = f.hackrf?.canais || {};
+  const chVal = (ch) => canais[ch]?.potencia_dbm != null
+    ? canais[ch].potencia_dbm.toFixed(1) + ' dBm' : '— dBm';
+  $('h_ch1').textContent  = chVal('1');
+  $('h_ch6').textContent  = chVal('6');
+  $('h_ch11').textContent = chVal('11');
+
+  /* FM + ghost count (campos corretos) */
+  const fm     = f.espectro?.fm     || [];
+  const ghosts = f.espectro?.anomalos || [];
+  $('h_fm').textContent    = fm.length;
+  $('h_ghost').textContent = ghosts.length;
+}
+
+function updateSignalList(intel) {
+  const $ = id => document.getElementById(id);
+
+  /* intel.sinais — freqs já em MHz, sem /1e6 */
+  const sinais = (intel.sinais || []).slice(0, 15);
+  $('h_intel').textContent = sinais.length;
+
+  /* FM from main WS (correct field) */
+  const fm     = liveData?.espectro?.fm || [];
+  const ghosts = liveData?.espectro?.anomalos || [];
+
+  const list = $('sigList');
+  const items = [
+    ...fm.slice(0, 5).map(s => ({
+      freq: s.freq_mhz, dbm: s.dbm,
+      type: s.nome || 'FM', color: '#4FAFFF'
+    })),
+    ...ghosts.slice(0, 4).map(s => ({
+      freq: s.freq_mhz, dbm: s.dbm,
+      type: `+${s.delta_db}dB`, color: '#FF3B30'
+    })),
+    ...sinais.filter(s => s.cat !== 'FM').slice(0, 6).map(s => ({
+      freq: s.freq_mhz, dbm: s.dbm,
+      type: s.cat, color: s.cor || '#47DF7F'
+    })),
+  ].slice(0, 14);
+
+  if (!items.length) {
+    list.innerHTML = '<div style="font-size:10px;color:var(--g3);padding:4px">aguardando scanner…</div>';
+    return;
+  }
+  list.innerHTML = items.map(s => `
+    <div class="sig-item">
+      <span class="sig-freq" style="color:${s.color}">${(s.freq||0).toFixed(1)} MHz</span>
+      <span class="sig-dbm">${(s.dbm||0).toFixed(1)} dBm</span>
+      <span class="sig-type" style="color:${s.color}">${s.type}</span>
+    </div>`).join('');
+}
+
+/* ─── Mouse / touch controls ────────────────────────────────────── */
+let drag = false, lastMX = 0, lastMY = 0;
+
+CV.addEventListener('mousedown', e => { drag = true; lastMX = e.clientX; lastMY = e.clientY; });
+window.addEventListener('mouseup',  () => drag = false);
+window.addEventListener('mousemove', e => {
+  if (!drag) return;
+  camTheta += (e.clientX - lastMX) * 0.008;
+  camPhi   += (e.clientY - lastMY) * 0.005;
+  camPhi    = Math.max(0.1, Math.min(1.3, camPhi));
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+CV.addEventListener('wheel', e => {
+  camDist = Math.max(150, Math.min(1200, camDist + e.deltaY * 0.5));
+  e.preventDefault();
+}, { passive: false });
+CV.addEventListener('dblclick', () => {
+  camTheta = 0.5; camPhi = 0.45; camDist = 500;
+});
+
+/* Touch */
+let lastTouchDist = 0;
+CV.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) { drag = true; lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY; }
+  if (e.touches.length === 2) { lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }
+});
+CV.addEventListener('touchend', () => drag = false);
+CV.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && drag) {
+    camTheta += (e.touches[0].clientX - lastMX) * 0.008;
+    camPhi   += (e.touches[0].clientY - lastMY) * 0.005;
+    camPhi    = Math.max(0.1, Math.min(1.3, camPhi));
+    lastMX = e.touches[0].clientX; lastMY = e.touches[0].clientY;
+  }
+  if (e.touches.length === 2) {
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    camDist = Math.max(150, Math.min(1200, camDist - (d - lastTouchDist) * 1.5));
+    lastTouchDist = d;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+/* ─── Button toggles ────────────────────────────────────────────── */
+function toggleRotate() {
+  autoRotate = !autoRotate;
+  document.getElementById('btnRotate').classList.toggle('active', autoRotate);
+}
+function toggleWire() {
+  showWire = !showWire;
+  document.getElementById('btnWire').classList.toggle('active', showWire);
+}
+function toggleParticles() {
+  showParticles = !showParticles;
+  document.getElementById('btnParticles').classList.toggle('active', showParticles);
+}
+</script>
+</body>
+</html>

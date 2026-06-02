@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINALRF // RÁDIO</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    :root {
+      --verde:    #47DF7F;
+      --amarelo:  #F5D800;
+      --vermelho: #FF4444;
+      --azul:     #4FAFFF;
+      --laranja:  #FF8C33;
+      --rosa:     #FF44AA;
+      --ciano:    #00FFCC;
+      --cinza:    #3a3a3a;
+      --fundo:    #000;
+      --painel:   #080808;
+      --borda:    #181818;
+      --texto:    #b0b0b0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--fundo);
+      color: var(--texto);
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ──────────────────────────────── */
+    .header {
+      border-bottom: 1px solid var(--borda);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      background: #020202;
+      z-index: 100;
+    }
+    .logo { color: var(--verde); font-size: 14px; font-weight: 700; letter-spacing: 3px; }
+    .sep  { color: var(--cinza); }
+    .sub  { color: #555; font-size: 11px; letter-spacing: 1px; }
+    .back { color: #444; text-decoration: none; font-size: 11px; }
+    .back:hover { color: var(--verde); }
+    .hrf-status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--cinza); display: inline-block;
+    }
+    .dot.ok   { background: var(--verde);   animation: pulse 2s infinite; }
+    .dot.busy { background: var(--amarelo); animation: pulse 0.5s infinite; }
+    .dot.err  { background: var(--vermelho); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .modo-tag {
+      font-size: 10px; letter-spacing: 1px;
+      padding: 2px 6px; border-radius: 3px;
+      background: rgba(71,223,127,.1); color: var(--verde);
+      display: none;
+    }
+    .modo-tag.vis { display: inline; }
+
+    /* ── Layout ──────────────────────────────── */
+    .main {
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .largo { grid-column: 1 / -1; }
+
+    /* ── Painel ──────────────────────────────── */
+    .painel {
+      background: var(--painel);
+      border: 1px solid var(--borda);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .pt {
+      background: #0c0c0c;
+      border-bottom: 1px solid var(--borda);
+      padding: 8px 14px;
+      font-size: 10px;
+      letter-spacing: 2.5px;
+      color: var(--verde);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .pt .badge {
+      font-size: 9px; padding: 1px 5px; border-radius: 2px;
+      background: rgba(71,223,127,.12); color: #4a9;
+    }
+    .pt .badge.amarelo {
+      background: rgba(245,216,0,.12); color: var(--amarelo);
+    }
+    .pb { padding: 14px 16px; }
+
+    /* ── Inputs e botões ─────────────────────── */
+    .row { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+    .lbl { font-size:10px; color:#555; min-width:62px; letter-spacing:.5px; }
+    input[type="text"], input[type="number"], select {
+      background:#0f0f0f; border:1px solid var(--cinza);
+      color:var(--verde); font-family:inherit; font-size:13px;
+      padding:5px 8px; border-radius:3px; outline:none;
+    }
+    input[type="number"] { width:85px; }
+    input[type="text"]   { width:120px; }
+    select { color:var(--texto); min-width:160px; }
+    select option { background:#0f0f0f; }
+    input:focus, select:focus { border-color:var(--verde); }
+
+    .btn {
+      background:transparent; border:1px solid var(--cinza); color:var(--texto);
+      font-family:inherit; font-size:10px; padding:5px 12px;
+      border-radius:3px; cursor:pointer; letter-spacing:1px;
+      transition:all .15s; white-space:nowrap;
+    }
+    .btn:hover            { border-color:var(--verde); color:var(--verde); }
+    .btn.ativo            { border-color:var(--verde); color:var(--verde); background:rgba(71,223,127,.1); }
+    .btn.parar            { border-color:var(--vermelho); color:var(--vermelho); }
+    .btn.parar:hover      { background:rgba(255,68,68,.08); }
+    .btn.amarelo          { border-color:var(--amarelo); color:var(--amarelo); }
+    .btn.amarelo:hover    { background:rgba(245,216,0,.08); }
+    .btn.azul             { border-color:var(--azul); color:var(--azul); }
+    .btn.azul:hover       { background:rgba(79,175,255,.08); }
+    .btn:disabled         { opacity:.28; cursor:not-allowed; }
+
+    .st { font-size:11px; color:#444; padding:3px 0; }
+    .st.ok   { color:var(--verde); }
+    .st.err  { color:var(--vermelho); }
+    .st.warn { color:var(--amarelo); }
+    .st.busy { color:var(--azul); }
+
+    /* ── ESCUTAR ─────────────────────────────── */
+    canvas.onda {
+      width:100%; height:64px; display:block;
+      background:#030303; border:1px solid #141414; border-radius:3px;
+      margin:10px 0 6px;
+    }
+    .db-row { display:flex; align-items:center; gap:10px; }
+    .db-val { min-width:60px; font-size:11px; color:#555; }
+    .db-track {
+      flex:1; height:3px; background:#111; border-radius:2px; overflow:hidden;
+    }
+    .db-fill { height:100%; background:var(--verde); width:0%; transition:width .1s; }
+
+    /* ── RASTREAR ────────────────────────────── */
+    .freq-add-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+    .freq-lista { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+    .freq-item {
+      display:flex; align-items:center; gap:8px;
+      padding:6px 8px; background:#060606;
+      border:1px solid #141414; border-radius:3px;
+    }
+    .fq-hz   { min-width:72px; color:var(--verde); font-size:12px; }
+    .fq-nome { min-width:100px; color:#555; font-size:10px; overflow:hidden; white-space:nowrap; }
+    .fq-bar-wrap { flex:1; height:5px; background:#111; border-radius:2px; overflow:hidden; }
+    .fq-bar  { height:100%; border-radius:2px; transition:width .5s; }
+    .fq-dbm  { min-width:58px; text-align:right; font-size:11px; color:#555; }
+    .fq-delta{ min-width:18px; text-align:center; font-size:11px; }
+    .fq-rm   { background:none; border:none; color:#2a2a2a; cursor:pointer; font-size:12px; padding:0 3px; }
+    .fq-rm:hover { color:var(--vermelho); }
+
+    canvas.chart {
+      width:100%; height:130px; display:block;
+      background:#030303; border:1px solid #141414; border-radius:3px;
+    }
+
+    /* ── CLONAR ──────────────────────────────── */
+    .prog-wrap {
+      height:2px; background:#111; border-radius:1px; overflow:hidden;
+      margin-top:8px; opacity:0; transition:opacity .2s;
+    }
+    .prog-wrap.vis { opacity:1; }
+    .prog-fill { height:100%; background:var(--verde); width:0%; transition:width .1s; }
+
+    .sinal-lista {
+      margin-top:10px; display:flex; flex-direction:column; gap:4px;
+      max-height:160px; overflow-y:auto;
+    }
+    .sinal-item {
+      display:flex; align-items:center; gap:8px;
+      padding:6px 8px; background:#060606;
+      border:1px solid #141414; border-radius:3px;
+    }
+    .sn-nome { flex:1; color:var(--verde); font-size:11px; }
+    .sn-sz   { color:#444; font-size:10px; min-width:50px; text-align:right; }
+    .sn-btn  { background:none; border:none; cursor:pointer; font-size:12px; opacity:.5; }
+    .sn-btn:hover { opacity:1; }
+
+    /* ── AUTO-CAPTURA ────────────────────────── */
+    .band-btns { display:flex; gap:5px; flex-wrap:wrap; }
+    .band-btn {
+      background:transparent; border:1px solid #222; color:#444;
+      font-family:inherit; font-size:9px; padding:4px 9px;
+      border-radius:3px; cursor:pointer; letter-spacing:.8px; white-space:nowrap;
+      transition:all .15s;
+    }
+    .band-btn:hover { border-color:var(--azul); color:var(--azul); }
+    .band-btn.sel   { border-color:var(--azul); color:var(--azul); background:rgba(79,175,255,.1); }
+    .ac-item {
+      display:flex; align-items:center; gap:8px;
+      padding:7px 10px; background:#050505;
+      border:1px solid #141414; border-radius:3px; cursor:pointer; transition:border-color .15s;
+    }
+    .ac-item:hover    { border-color:#2a2a2a; }
+    .ac-item.anomalia { border-color:rgba(245,216,0,.25); }
+    .ac-freq  { min-width:76px; font-size:13px; font-weight:600; }
+    .ac-nome  { flex:1; font-size:10px; color:#555; }
+    .ac-bar   { width:70px; height:3px; background:#111; border-radius:2px; overflow:hidden; }
+    .ac-bar-f { height:100%; border-radius:2px; }
+    .ac-dbm   { min-width:62px; text-align:right; font-size:11px; }
+    .ac-capbtn {
+      background:transparent; border:1px solid var(--azul); color:var(--azul);
+      font-family:inherit; font-size:9px; padding:3px 8px; border-radius:3px;
+      cursor:pointer; white-space:nowrap; letter-spacing:.5px;
+    }
+    .ac-capbtn:hover { background:rgba(79,175,255,.1); }
+    .scan-spinner {
+      display:inline-block; width:10px; height:10px;
+      border:2px solid #333; border-top-color:var(--azul);
+      border-radius:50%; animation:spin .6s linear infinite; vertical-align:middle;
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* ── TRANSMITIR ──────────────────────────── */
+    .aviso {
+      background:rgba(245,216,0,.05); border:1px solid rgba(245,216,0,.25);
+      border-radius:3px; padding:8px 12px; margin-bottom:12px;
+      font-size:10px; color:var(--amarelo); line-height:1.7; letter-spacing:.3px;
+    }
+    input[type="range"] {
+      -webkit-appearance:none; width:90px; height:4px;
+      background:var(--cinza); border-radius:2px; outline:none; cursor:pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance:none; width:11px; height:11px; border-radius:50%;
+      background:var(--amarelo); cursor:pointer;
+    }
+    .pot-val { font-size:12px; color:var(--amarelo); min-width:30px; }
+
+    /* ── Scrollbar ───────────────────────────── */
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:#000; }
+    ::-webkit-scrollbar-thumb { background:#252525; border-radius:2px; }
+  </style>
+</head>
+<body>
+
+<script src="nav.js"></script>
+
+<!-- ── Header ──────────────────────────────────────────────────── -->
+<header class="header">
+  <span class="logo">SINALRF</span>
+  <span class="sep">//</span>
+  <span class="sub">RÁDIO OPERACIONAL</span>
+  <a href="/" class="back">◀ DASHBOARD</a>
+  <a href="/scanner.html" class="back" style="margin-left:4px">🌌 SCANNER</a>
+  <a href="/imsi-catcher.html" class="back" style="margin-left:4px">📱 IMSI</a>
+  <div class="hrf-status">
+    <span class="dot" id="hDot"></span>
+    <span id="hTxt">verificando…</span>
+    <span class="modo-tag" id="hModo"></span>
+  </div>
+</header>
+
+<!-- ── Main grid ───────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- ═══════════════════════════════════════ ESCUTAR ══ -->
+  <div class="painel">
+    <div class="pt">ESCUTAR <span class="badge">FM / AM / SDR</span></div>
+    <div class="pb">
+      <div class="row">
+        <span class="lbl">FREQUÊNCIA</span>
+        <input type="number" id="escFreq" value="98.1" step="0.1" min="1" max="2000">
+        <span style="color:#555;font-size:11px">MHz</span>
+        <button class="btn primario" id="escBtn" onclick="escutarToggle()">▶ ESCUTAR</button>
+        <button class="btn parar" id="escPararBtn" style="display:none" onclick="escutarParar()">■ PARAR</button>
+      </div>
+      <canvas class="onda" id="ondaCanvas" width="600" height="64"></canvas>
+      <div class="db-row">
+        <span class="db-val" id="dbVal">— dB</span>
+        <div class="db-track"><div class="db-fill" id="dbFill"></div></div>
+      </div>
+      <div class="st" id="escSt">Aguardando frequência…</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ CLONAR ═══ -->
+  <div class="painel">
+    <div class="pt">CLONAR SINAL <span class="badge">CAPTURA IQ</span></div>
+    <div class="pb">
+      <div class="row">
+        <span class="lbl">FREQUÊNCIA</span>
+        <input type="number" id="clFreq" value="98.1" step="0.1" min="1" max="6000">
+        <span style="color:#555;font-size:11px">MHz</span>
+      </div>
+      <div class="row">
+        <span class="lbl">DURAÇÃO</span>
+        <input type="number" id="clDur" value="3" step="0.5" min="0.5" max="30">
+        <span style="color:#555;font-size:11px">s</span>
+        <button class="btn azul" id="clBtn" onclick="clonarIniciar()">⬇ CAPTURAR</button>
+      </div>
+      <div class="prog-wrap" id="clProg"><div class="prog-fill" id="clProgFill"></div></div>
+      <div class="st" id="clSt">Pronto</div>
+
+      <div style="margin-top:6px;font-size:10px;color:#333;letter-spacing:1px">SINAIS CAPTURADOS</div>
+      <div class="sinal-lista" id="sinalLista"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ AUTO-CAPTURA ═ -->
+  <div class="painel largo">
+    <div class="pt">AUTO-CAPTURA <span class="badge">DETECÇÃO AUTOMÁTICA DE SINAL</span></div>
+    <div class="pb">
+
+      <!-- Presets de banda -->
+      <div class="row" style="margin-bottom:12px">
+        <span class="lbl">BANDA</span>
+        <div class="band-btns" id="bandBtns">
+          <button class="band-btn" onclick="setBanda(88,108,0.3,this)">📻 FM (88–108)</button>
+          <button class="band-btn" onclick="setBanda(108,300,1,this)">✈ VHF (108–300)</button>
+          <button class="band-btn" onclick="setBanda(300,500,0.5,this)">🔑 CONTROLES (300–500)</button>
+          <button class="band-btn" onclick="setBanda(856,870,0.3,this)">📶 ISM 868</button>
+          <button class="band-btn" onclick="setBanda(700,900,2,this)">📱 CELULAR (700–900)</button>
+          <button class="band-btn sel" onclick="setBanda(88,900,1,this)">🌐 TODOS (88–900)</button>
+        </div>
+      </div>
+
+      <!-- Controles finos -->
+      <div class="row">
+        <span class="lbl">FAIXA</span>
+        <input type="number" id="acMin" value="88" step="1" min="1" max="6000" style="width:65px">
+        <span style="color:#333">—</span>
+        <input type="number" id="acMax" value="900" step="1" min="1" max="6000" style="width:65px">
+        <span style="color:#555;font-size:11px">MHz</span>
+        <span class="lbl" style="margin-left:12px">THRESHOLD</span>
+        <input type="number" id="acThr" value="-75" step="5" min="-110" max="-20" style="width:60px">
+        <span style="color:#555;font-size:11px">dBm</span>
+        <span class="lbl" style="margin-left:12px">DURAÇÃO CAPTURA</span>
+        <input type="number" id="acDur" value="3" step="0.5" min="0.5" max="30" style="width:55px">
+        <span style="color:#555;font-size:11px">s</span>
+        <button class="btn azul" id="acBtn" onclick="autoScan()">🔍 ESCANEAR</button>
+      </div>
+
+      <div class="st" id="acSt">Selecione uma banda e clique ESCANEAR — o sistema detecta sinais automaticamente</div>
+
+      <!-- Dica para controles remotos -->
+      <div id="acDicaRemote" style="display:none;margin-top:6px;padding:6px 10px;background:rgba(79,175,255,.05);border:1px solid rgba(79,175,255,.2);border-radius:3px;font-size:10px;color:#4FAFFF;line-height:1.6">
+        💡 Para capturar um controle remoto (433 MHz): clique <b>CAPTURAR</b> no sinal detectado e depois aperte o botão do controle durante a captura. O sinal só aparece enquanto você pressiona.
+      </div>
+
+      <!-- Resultados -->
+      <div style="display:flex; flex-direction:column; gap:5px; margin-top:12px; max-height:280px; overflow-y:auto" id="acResultados"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ TRANSMITIR ═ -->
+  <div class="painel">
+    <div class="pt">TRANSMITIR <span class="badge amarelo">⚠ LICENÇA</span></div>
+    <div class="pb">
+      <div class="aviso">
+        ⚠ ATENÇÃO — transmitir sem licença é infração prevista na Lei nº 9.472/97.<br>
+        Use exclusivamente em ambiente blindado (Faraday cage) ou com autorização ANATEL.
+      </div>
+      <div class="row">
+        <span class="lbl">FREQUÊNCIA</span>
+        <input type="number" id="txFreq" value="98.1" step="0.1" min="1" max="6000">
+        <span style="color:#555;font-size:11px">MHz</span>
+      </div>
+      <div class="row">
+        <span class="lbl">POTÊNCIA</span>
+        <input type="range" id="txPot" min="0" max="47" value="20" oninput="txPotAtualizar()">
+        <span class="pot-val" id="txPotVal">20 dB</span>
+      </div>
+      <div class="row">
+        <span class="lbl">SINAL</span>
+        <select id="txArquivo"><option value="">— selecione um arquivo —</option></select>
+      </div>
+      <div class="row">
+        <button class="btn amarelo" id="txBtn" onclick="txToggle()">📡 TRANSMITIR</button>
+        <button class="btn parar" id="txPararBtn" style="display:none" onclick="txParar()">■ PARAR</button>
+      </div>
+      <div class="st" id="txSt">Selecione um arquivo capturado</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ RASTREAR ═══ -->
+  <div class="painel largo">
+    <div class="pt">RASTREAR FREQUÊNCIAS <span class="badge">TEMPO REAL</span></div>
+    <div class="pb">
+      <div class="freq-add-row">
+        <span class="lbl">ADICIONAR</span>
+        <input type="number" id="trFreq" value="98.1" step="0.1" min="1" max="900" placeholder="MHz">
+        <span style="color:#555;font-size:11px">MHz</span>
+        <input type="text" id="trNome" placeholder="nome opcional" style="width:120px">
+        <button class="btn primario" onclick="rastrearAdicionar()">+ FREQ</button>
+        <button class="btn" id="trBtn" onclick="rastrearToggle()">▶ INICIAR</button>
+        <button class="btn parar" id="trPararBtn" style="display:none" onclick="rastrearParar()">■ PARAR</button>
+        <span class="st" id="trSt" style="margin-left:8px">—</span>
+      </div>
+
+      <div class="freq-lista" id="freqLista"></div>
+      <canvas class="chart" id="chartCanvas" width="1200" height="130"></canvas>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   SinalRF — Rádio Operacional
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const BASE = location.origin;
+const WS   = `ws://${location.host}`;
+
+// ── Cores das frequências rastreadas ──────────────────────────────────────────
+const CORES = ['#47DF7F','#F5D800','#4FAFFF','#FF8C33','#FF44AA','#00FFCC','#AA88FF'];
+
+// ── FM Brasil (lookup rápido) ─────────────────────────────────────────────────
+const FM_NOMES = {
+  87.5:'Rádio',88.1:'Band',88.9:'',89.5:'',90.1:'CBN',90.9:'Jovem Pan',
+  91.3:'',91.9:'',92.5:'Transamérica',93.1:'',93.7:'Antena 1',
+  94.3:'',94.9:'',95.5:'',96.1:'',96.7:'',97.3:'',97.9:'Mix',
+  98.5:'',99.1:'',99.7:'',100.3:'',100.9:'',101.5:'',102.1:'',
+  102.7:'',103.3:'',103.9:'',104.5:'',105.1:'',105.7:'',106.3:'',106.9:'',
+  107.3:'',107.9:''
+};
+function fmNome(mhz) {
+  const k = Object.keys(FM_NOMES).find(f => Math.abs(f - mhz) < 0.15);
+  return k ? FM_NOMES[k] : '';
+}
+
+// ═══ STATUS ══════════════════════════════════════════════════════════════════
+let _statusInterval;
+async function pollStatus() {
+  try {
+    const r = await fetch('/api/hackrf/status');
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    const dot  = document.getElementById('hDot');
+    const txt  = document.getElementById('hTxt');
+    const modo = document.getElementById('hModo');
+    if (!d.conectado) {
+      dot.className  = 'dot err';
+      txt.textContent = 'HackRF desconectado';
+    } else if (d.ocupado) {
+      dot.className  = 'dot busy';
+      txt.textContent = 'HackRF ocupado';
+    } else {
+      dot.className  = 'dot ok';
+      txt.textContent = 'HackRF pronto';
+    }
+    if (d.modo !== 'idle') {
+      modo.textContent = d.modo.toUpperCase();
+      modo.classList.add('vis');
+    } else {
+      modo.classList.remove('vis');
+    }
+  } catch {
+    document.getElementById('hDot').className = 'dot err';
+    document.getElementById('hTxt').textContent = 'servidor offline';
+  }
+}
+_statusInterval = setInterval(pollStatus, 2000);
+pollStatus();
+
+// ═══ ESCUTAR ══════════════════════════════════════════════════════════════════
+let _audioCtx   = null;
+let _radioWs    = null;
+let _nextAt     = 0;
+let _escutando  = false;
+let _ondaHist   = new Float32Array(600);
+
+function escutarToggle() {
+  if (_escutando) { escutarParar(); return; }
+  const freq = parseFloat(document.getElementById('escFreq').value);
+  if (!freq || freq < 1) return;
+
+  _audioCtx = new AudioContext({ sampleRate: 48000 });
+  _nextAt   = _audioCtx.currentTime + 0.1;
+  _radioWs  = new WebSocket(`${WS}/ws/radio?freq=${freq}`);
+  _radioWs.binaryType = 'arraybuffer';
+
+  setSt('escSt', 'Conectando…', 'busy');
+  document.getElementById('escBtn').style.display = 'none';
+  document.getElementById('escPararBtn').style.display = '';
+
+  _radioWs.onmessage = (ev) => {
+    if (typeof ev.data === 'string') {
+      const msg = JSON.parse(ev.data);
+      if (msg.erro) { setSt('escSt', msg.erro, 'err'); escutarParar(); return; }
+      setSt('escSt', `▶ ${freq} MHz — ${msg.freq_mhz ? msg.freq_mhz.toFixed(1) : freq} MHz  48kHz/16bit`, 'ok');
+      return;
+    }
+    // PCM int16 binário
+    const pcm16 = new Int16Array(ev.data);
+    const f32   = new Float32Array(pcm16.length);
+    let mx = 0;
+    for (let i = 0; i < pcm16.length; i++) {
+      f32[i] = pcm16[i] / 32768;
+      mx = Math.max(mx, Math.abs(f32[i]));
+    }
+
+    // Waveform history
+    const step = Math.max(1, Math.floor(f32.length / 20));
+    const novo = f32.filter((_, i) => i % step === 0);
+    _ondaHist = new Float32Array([..._ondaHist, ...novo].slice(-600));
+
+    // Volume meter
+    const db = mx > 0 ? Math.max(-60, 20 * Math.log10(mx)) : -60;
+    const pct = ((db + 60) / 60 * 100).toFixed(1);
+    document.getElementById('dbFill').style.width = pct + '%';
+    document.getElementById('dbVal').textContent  = db.toFixed(1) + ' dB';
+
+    // Audio scheduling
+    const buf = _audioCtx.createBuffer(1, f32.length, 48000);
+    buf.getChannelData(0).set(f32);
+    const src = _audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(_audioCtx.destination);
+    const now = _audioCtx.currentTime;
+    if (_nextAt < now) _nextAt = now + 0.05;
+    src.start(_nextAt);
+    _nextAt += buf.duration;
+  };
+
+  _radioWs.onclose = () => { if (_escutando) escutarParar(); };
+  _radioWs.onerror = () => { setSt('escSt', 'Erro de conexão', 'err'); escutarParar(); };
+  _escutando = true;
+  requestAnimationFrame(desenharOnda);
+}
+
+function escutarParar() {
+  _escutando = false;
+  if (_radioWs) {
+    try { _radioWs.send('STOP'); } catch {}
+    try { _radioWs.close(); }  catch {}
+    _radioWs = null;
+  }
+  if (_audioCtx) { _audioCtx.close().catch(() => {}); _audioCtx = null; }
+  document.getElementById('escBtn').style.display = '';
+  document.getElementById('escPararBtn').style.display = 'none';
+  setSt('escSt', 'Parado', '');
+  document.getElementById('dbFill').style.width = '0%';
+  document.getElementById('dbVal').textContent  = '— dB';
+}
+
+function desenharOnda() {
+  if (!_escutando) return;
+  const cv = document.getElementById('ondaCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.fillStyle = '#030303';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#47DF7F';
+  ctx.lineWidth = 1.2;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  const data = _ondaHist;
+  for (let i = 0; i < W; i++) {
+    const v = data[Math.floor(i * data.length / W)] || 0;
+    const y = (H / 2) - v * (H / 2 - 4);
+    i === 0 ? ctx.moveTo(i, y) : ctx.lineTo(i, y);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(desenharOnda);
+}
+
+// ═══ CLONAR ═══════════════════════════════════════════════════════════════════
+async function clonarIniciar() {
+  const freq = parseFloat(document.getElementById('clFreq').value);
+  const dur  = parseFloat(document.getElementById('clDur').value);
+  if (!freq || !dur) return;
+
+  const btn = document.getElementById('clBtn');
+  btn.disabled = true;
+  setSt('clSt', `Capturando ${freq} MHz por ${dur}s…`, 'busy');
+
+  const prog = document.getElementById('clProg');
+  const fill = document.getElementById('clProgFill');
+  prog.classList.add('vis');
+  fill.style.width = '0%';
+
+  // Animação de progresso falso (duração estimada)
+  const t0   = Date.now();
+  const msEst = (dur + 3) * 1000;
+  const timer = setInterval(() => {
+    const pct = Math.min(95, (Date.now() - t0) / msEst * 100);
+    fill.style.width = pct + '%';
+  }, 200);
+
+  try {
+    const r = await fetch(`/api/hackrf/clonar?freq=${freq}&duracao=${dur}`, { method: 'POST' });
+    clearInterval(timer);
+    fill.style.width = '100%';
+    if (!r.ok) {
+      const e = await r.json();
+      throw new Error(e.detail || r.status);
+    }
+    const d = await r.json();
+    const kb = (d.tamanho / 1024).toFixed(0);
+    setSt('clSt', `✓ Salvo: ${d.arquivo}  (${kb} KB)`, 'ok');
+    await carregarSinais();
+  } catch (e) {
+    clearInterval(timer);
+    setSt('clSt', 'Erro: ' + e.message, 'err');
+  } finally {
+    setTimeout(() => { prog.classList.remove('vis'); fill.style.width = '0%'; }, 1500);
+    btn.disabled = false;
+  }
+}
+
+async function carregarSinais() {
+  try {
+    const r = await fetch('/api/hackrf/sinais');
+    const d = await r.json();
+    renderSinais(d.sinais || []);
+    popularTxSelect(d.sinais || []);
+  } catch {}
+}
+
+function renderSinais(lista) {
+  const el = document.getElementById('sinalLista');
+  if (!lista.length) { el.innerHTML = '<div class="st">Nenhum sinal capturado</div>'; return; }
+  el.innerHTML = lista.map(s => {
+    const kb   = (s.tamanho / 1024).toFixed(0);
+    const data = new Date(s.criado * 1000).toLocaleTimeString('pt-BR');
+    return `<div class="sinal-item">
+      <span class="sn-nome">${s.nome}</span>
+      <span class="sn-sz">${kb} KB</span>
+      <span style="color:#444;font-size:10px">${data}</span>
+      <button class="sn-btn" title="Escutar" onclick="escutarArquivo('${s.nome}')">🔊</button>
+      <button class="sn-btn" title="Carregar TX" onclick="carregarTx('${s.nome}')">📡</button>
+      <button class="sn-btn" title="Deletar" onclick="deletarSinal('${s.nome}')">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function popularTxSelect(lista) {
+  const sel = document.getElementById('txArquivo');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— selecione um arquivo —</option>' +
+    lista.map(s => `<option value="${s.nome}">${s.nome}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+async function deletarSinal(nome) {
+  if (!confirm(`Deletar ${nome}?`)) return;
+  await fetch(`/api/hackrf/sinais/${encodeURIComponent(nome)}`, { method: 'DELETE' });
+  await carregarSinais();
+}
+
+function carregarTx(nome) {
+  const sel = document.getElementById('txArquivo');
+  sel.value = nome;
+  // Parse freq do nome (ex: 98.100MHz_...)
+  const m = nome.match(/^(\d+\.\d+)MHz/);
+  if (m) document.getElementById('txFreq').value = m[1];
+  setSt('txSt', `Arquivo carregado: ${nome}`, 'ok');
+}
+
+function escutarArquivo(nome) {
+  // Para o escutar atual se ativo, ajusta a freq
+  const m = nome.match(/^(\d+\.\d+)MHz/);
+  if (m) document.getElementById('escFreq').value = m[1];
+  setSt('clSt', 'Frequência copiada para ESCUTAR', 'ok');
+}
+
+// ═══ TRANSMITIR ═══════════════════════════════════════════════════════════════
+let _txAtivo = false;
+
+function txPotAtualizar() {
+  const v = document.getElementById('txPot').value;
+  document.getElementById('txPotVal').textContent = v + ' dB';
+}
+
+async function txToggle() {
+  if (_txAtivo) { await txParar(); return; }
+  const freq  = parseFloat(document.getElementById('txFreq').value);
+  const arq   = document.getElementById('txArquivo').value;
+  const pot   = parseInt(document.getElementById('txPot').value);
+
+  if (!arq) { setSt('txSt', 'Selecione um arquivo', 'err'); return; }
+  if (!freq) { setSt('txSt', 'Frequência inválida', 'err'); return; }
+
+  setSt('txSt', `Transmitindo ${freq} MHz @ ${pot} dB…`, 'warn');
+  document.getElementById('txBtn').style.display = 'none';
+  document.getElementById('txPararBtn').style.display = '';
+  _txAtivo = true;
+
+  try {
+    const r = await fetch(
+      `/api/hackrf/transmitir/iniciar?freq=${freq}&arquivo=${encodeURIComponent(arq)}&potencia=${pot}`,
+      { method: 'POST' }
+    );
+    if (!r.ok) {
+      const e = await r.json();
+      throw new Error(e.detail || r.status);
+    }
+    const d = await r.json();
+    setSt('txSt', `▶ TX ativo — PID ${d.pid}  freq=${d.freq} MHz  pot=${d.potencia} dB`, 'warn');
+  } catch (e) {
+    setSt('txSt', 'Erro: ' + e.message, 'err');
+    txReset();
+  }
+}
+
+async function txParar() {
+  try {
+    await fetch('/api/hackrf/transmitir/parar', { method: 'POST' });
+  } catch {}
+  txReset();
+  setSt('txSt', '■ Transmissão encerrada', '');
+}
+
+function txReset() {
+  _txAtivo = false;
+  document.getElementById('txBtn').style.display = '';
+  document.getElementById('txPararBtn').style.display = 'none';
+}
+
+// ═══ RASTREAR ═══════════════════════════════════════════════════════════════
+let _rastrFreqs   = [];   // [{mhz, nome, cor}]
+let _rastrHist    = {};   // { mhz: [dbm, ...] }
+let _rastrTimer   = null;
+let _rastrAtivo   = false;
+const HIST_MAX    = 60;
+
+function rastrearAdicionar() {
+  const mhz  = parseFloat(document.getElementById('trFreq').value);
+  const nome = document.getElementById('trNome').value.trim() || fmNome(mhz) || `${mhz} MHz`;
+  if (!mhz || _rastrFreqs.find(f => Math.abs(f.mhz - mhz) < 0.05)) return;
+  if (_rastrFreqs.length >= CORES.length) {
+    setSt('trSt', 'Máx. ' + CORES.length + ' frequências', 'err'); return;
+  }
+  const cor = CORES[_rastrFreqs.length];
+  _rastrFreqs.push({ mhz, nome, cor });
+  _rastrHist[mhz] = [];
+  document.getElementById('trNome').value = '';
+  renderFreqLista();
+}
+
+function rastrearRemover(mhz) {
+  _rastrFreqs = _rastrFreqs.filter(f => f.mhz !== mhz);
+  delete _rastrHist[mhz];
+  renderFreqLista();
+}
+
+function renderFreqLista() {
+  const el = document.getElementById('freqLista');
+  if (!_rastrFreqs.length) {
+    el.innerHTML = '<div class="st">Nenhuma frequência adicionada</div>'; return;
+  }
+  el.innerHTML = _rastrFreqs.map(f => {
+    const hist  = _rastrHist[f.mhz] || [];
+    const dbm   = hist.length ? hist[hist.length - 1] : null;
+    const prev  = hist.length > 1 ? hist[hist.length - 2] : null;
+    const delta = (dbm !== null && prev !== null) ? dbm - prev : 0;
+    const pct   = dbm !== null ? Math.max(0, Math.min(100, (dbm + 100) / 60 * 100)) : 0;
+    const dstr  = delta >  0.5 ? '↑' : delta < -0.5 ? '↓' : '·';
+    const dcol  = delta >  0.5 ? '#47DF7F' : delta < -0.5 ? '#FF4444' : '#444';
+    return `<div class="freq-item">
+      <span class="fq-hz" style="color:${f.cor}">${f.mhz.toFixed(1)} MHz</span>
+      <span class="fq-nome">${f.nome}</span>
+      <div class="fq-bar-wrap"><div class="fq-bar" style="background:${f.cor};width:${pct}%"></div></div>
+      <span class="fq-dbm">${dbm !== null ? dbm.toFixed(1) + ' dBm' : '—'}</span>
+      <span class="fq-delta" style="color:${dcol}">${dstr}</span>
+      <button class="fq-rm" onclick="rastrearRemover(${f.mhz})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function rastrearToggle() {
+  if (_rastrAtivo) { rastrearParar(); return; }
+  if (!_rastrFreqs.length) { setSt('trSt', 'Adicione frequências', 'err'); return; }
+  _rastrAtivo = true;
+  document.getElementById('trBtn').style.display = 'none';
+  document.getElementById('trPararBtn').style.display = '';
+  setSt('trSt', 'Rastreando…', 'ok');
+  _rastrTimer = setInterval(rastrearTick, 4000);
+  rastrearTick();
+  requestAnimationFrame(desenharChart);
+}
+
+function rastrearParar() {
+  _rastrAtivo = false;
+  clearInterval(_rastrTimer);
+  document.getElementById('trBtn').style.display = '';
+  document.getElementById('trPararBtn').style.display = 'none';
+  setSt('trSt', 'Parado', '');
+}
+
+async function rastrearTick() {
+  if (!_rastrFreqs.length) return;
+  const param = _rastrFreqs.map(f => f.mhz).join(',');
+  try {
+    const r = await fetch(`/api/hackrf/rastrear?freqs=${param}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    for (const l of d.leituras) {
+      const hist = _rastrHist[l.freq];
+      if (!hist) continue;
+      if (l.dbm !== null) {
+        hist.push(l.dbm);
+        if (hist.length > HIST_MAX) hist.shift();
+      }
+    }
+    renderFreqLista();
+    setSt('trSt', `${d.n_pontos} pts  ts=${new Date().toLocaleTimeString()}`, 'ok');
+  } catch (e) {
+    setSt('trSt', 'Erro: ' + e.message, 'err');
+  }
+}
+
+function desenharChart() {
+  if (!_rastrAtivo) return;
+  const cv  = document.getElementById('chartCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+
+  ctx.fillStyle = '#030303';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 1;
+  const dbStep = 10;
+  for (let db = -100; db <= -40; db += dbStep) {
+    const y = H - (db + 100) / 60 * H;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillStyle = '#333'; ctx.font = '9px JetBrains Mono';
+    ctx.fillText(db + ' dB', 4, y - 2);
+  }
+
+  // Linhas por frequência
+  for (const f of _rastrFreqs) {
+    const hist = _rastrHist[f.mhz] || [];
+    if (hist.length < 2) continue;
+    ctx.strokeStyle = f.cor;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    for (let i = 0; i < hist.length; i++) {
+      const x = i / (HIST_MAX - 1) * W;
+      const y = H - (hist[i] + 100) / 60 * H;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // Label no final
+    const last = hist[hist.length - 1];
+    const x0   = (hist.length - 1) / (HIST_MAX - 1) * W;
+    const y0   = H - (last + 100) / 60 * H;
+    ctx.fillStyle = f.cor;
+    ctx.font = '10px JetBrains Mono';
+    ctx.fillText(`${f.mhz.toFixed(1)}`, Math.min(x0 + 3, W - 55), y0 - 4);
+    ctx.globalAlpha = 1;
+  }
+
+  requestAnimationFrame(desenharChart);
+}
+
+// ═══ AUTO-CAPTURA ═════════════════════════════════════════════════════════════
+let _acSep = 1.0;
+
+function setBanda(min, max, sep, btn) {
+  document.getElementById('acMin').value = min;
+  document.getElementById('acMax').value = max;
+  _acSep = sep;
+  // Mostra dica para controles remotos
+  const dica = document.getElementById('acDicaRemote');
+  dica.style.display = (min >= 300 && max <= 500) ? 'block' : 'none';
+  // Destaca botão selecionado
+  document.querySelectorAll('.band-btn').forEach(b => b.classList.remove('sel'));
+  if (btn) btn.classList.add('sel');
+}
+
+async function autoScan() {
+  const min = parseFloat(document.getElementById('acMin').value);
+  const max = parseFloat(document.getElementById('acMax').value);
+  const thr = parseFloat(document.getElementById('acThr').value);
+  const btn = document.getElementById('acBtn');
+
+  btn.disabled = true;
+  setSt('acSt', '<span class="scan-spinner"></span> Escaneando espectro…', 'busy');
+  document.getElementById('acSt').innerHTML =
+    '<span class="scan-spinner"></span> Escaneando ' + min + '–' + max + ' MHz…';
+  document.getElementById('acResultados').innerHTML =
+    '<div class="st busy" style="padding:8px 0">Varrendo espectro — aguarde…</div>';
+
+  try {
+    const url = `/api/hackrf/scan_auto?min_mhz=${min}&max_mhz=${max}&threshold=${thr}&min_sep_mhz=${_acSep}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+
+    const el = document.getElementById('acSt');
+    if (!d.picos || !d.picos.length) {
+      el.textContent = d.msg || 'Nenhum sinal detectado nessa faixa';
+      el.className = 'st warn';
+      document.getElementById('acResultados').innerHTML =
+        '<div class="st warn" style="padding:8px 0">Tente reduzir o threshold ou aguardar mais varreduras</div>';
+      return;
+    }
+
+    const baselineAviso = !d.baseline_ok
+      ? ' · <span style="color:#555">(baseline calibrando…)</span>' : '';
+    el.innerHTML = `${d.total} sinal(is) detectado(s)${baselineAviso}`;
+    el.className = 'st ok';
+
+    const dur = parseFloat(document.getElementById('acDur').value) || 3;
+    document.getElementById('acResultados').innerHTML = d.picos.map(p => {
+      const pct = Math.max(4, Math.min(100, (p.dbm + 100) / 60 * 100));
+      const cor = p.dbm > -55 ? '#47DF7F'
+                : p.dbm > -70 ? '#F5D800'
+                :               '#4FAFFF';
+      const anomTag = p.tipo === 'anomalia'
+        ? '<span style="font-size:9px;color:#F5D800;margin-left:4px">⚡ SPIKE</span>' : '';
+      return `<div class="ac-item ${p.tipo === 'anomalia' ? 'anomalia' : ''}"
+                   onclick="acSelecionar(${p.freq_mhz}, ${dur})">
+        <span class="ac-freq" style="color:${cor}">${p.freq_mhz} MHz</span>
+        <span class="ac-nome">${p.nome}${anomTag}</span>
+        <div class="ac-bar"><div class="ac-bar-f" style="background:${cor};width:${pct}%"></div></div>
+        <span class="ac-dbm" style="color:${cor}">${p.dbm} dBm</span>
+        <button class="btn" style="font-size:9px;padding:3px 8px"
+                onclick="event.stopPropagation();acEscutar(${p.freq_mhz})">▶ ESCUTAR</button>
+        <button class="ac-capbtn"
+                onclick="event.stopPropagation();acCapturar(${p.freq_mhz}, ${dur})">⬇ CAPTURAR</button>
+      </div>`;
+    }).join('');
+
+  } catch (e) {
+    setSt('acSt', 'Erro: ' + e.message, 'err');
+    document.getElementById('acResultados').innerHTML = '';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function acSelecionar(freq, dur) {
+  document.getElementById('clFreq').value  = freq;
+  document.getElementById('escFreq').value = freq;
+  setSt('clSt', `${freq} MHz selecionado — clique CAPTURAR`, 'ok');
+}
+
+function acEscutar(freq) {
+  document.getElementById('escFreq').value = freq;
+  escutarParar();
+  setTimeout(escutarToggle, 100);
+}
+
+function acCapturar(freq, dur) {
+  document.getElementById('clFreq').value = freq;
+  document.getElementById('clDur').value  = dur;
+  clonarIniciar();
+  document.getElementById('clBtn').closest('.painel')
+    .scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ═══ Helpers ══════════════════════════════════════════════════════════════════
+function setSt(id, txt, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = txt;
+  el.className   = 'st' + (cls ? ' ' + cls : '');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+carregarSinais();
+
+// Adicionar freq padrão no rastrear
+function rastrearPreset() {
+  [{ mhz: 88.5, nome: 'FM 88.5' }, { mhz: 98.1, nome: 'Band FM' }, { mhz: 107.9, nome: 'FM 107.9' }]
+    .forEach(f => {
+      if (!_rastrFreqs.find(x => Math.abs(x.mhz - f.mhz) < 0.05)) {
+        _rastrFreqs.push({ mhz: f.mhz, nome: f.nome, cor: CORES[_rastrFreqs.length] });
+        _rastrHist[f.mhz] = [];
+      }
+    });
+  renderFreqLista();
+}
+rastrearPreset();
+
+// Enter nos inputs de rastrear
+document.getElementById('trFreq').addEventListener('keydown', e => { if (e.key === 'Enter') rastrearAdicionar(); });
+
+</script>
+</body>
+</html>

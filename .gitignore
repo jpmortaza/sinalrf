@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Logs e dados capturados
+*.log
+grgsm.log
+instalar_grgsm.log
+sinais/
+
+# Binários compilados (Swift/C)
+rssi_reader
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Dados IQ capturados
+*.iq
+*.bin
+*.raw
+*.cfile
+
+# Chaves e segredos
+.env
+*.key
+*.pem

@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINALRF // INTERCEPTAÇÃO + IMSI</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    body { color: var(--g3); }
+
+    /* ── STATUS BAR ─────────────────────────────── */
+    .sbar {
+      background: var(--bg); border-bottom: 1px solid var(--border2);
+      padding: 5px 16px; display: flex; align-items: center; gap: 12px;
+      font-size: 10px; position: sticky; top: 40px; z-index: 190;
+      flex-wrap: wrap;
+    }
+    .si { display: flex; align-items: center; gap: 5px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--g4); flex-shrink: 0; }
+    .dot.ok   { background: var(--g);  box-shadow: var(--glow-g); animation: pulse 2s infinite; }
+    .dot.err  { background: var(--r);  animation: pulse .5s infinite; }
+    .dot.busy { background: var(--y);  animation: pulse .4s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .si-lbl { color: var(--g4); letter-spacing: .5px; }
+    .si-val { color: var(--g2); }
+    .sbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .sb-btn {
+      background: transparent; border: 1px solid var(--border2); color: var(--g2);
+      font-family: var(--font); font-size: 9px; padding: 4px 10px;
+      cursor: pointer; letter-spacing: 1px; transition: all .15s;
+    }
+    .sb-btn:hover     { border-color: var(--g); color: var(--g); }
+    .sb-btn.start     { border-color: var(--g3); color: var(--g); }
+    .sb-btn.start:hover { background: rgba(71,223,127,.1); }
+    .sb-btn.stop      { border-color: rgba(255,59,48,.4); color: var(--r); }
+    .sb-btn.stop:hover  { background: rgba(255,59,48,.07); }
+    .sb-btn:disabled  { opacity: .3; cursor: not-allowed; }
+
+    /* ── STATS ──────────────────────────────────── */
+    .stats {
+      display: flex; gap: 1px; background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-c {
+      flex: 1; padding: 10px 14px; background: var(--bg2);
+      text-align: center;
+    }
+    .stat-n { font-size: 20px; font-weight: 700; line-height: 1; }
+    .stat-l { font-size: 9px; letter-spacing: 1.5px; color: var(--g4); margin-top: 3px; }
+
+    /* ── LAYOUT ──────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 230px 1fr 270px;
+      gap: 0;
+      height: calc(100vh - 130px);   /* fixo — preenche viewport */
+      overflow: hidden;
+    }
+
+    /* ── SIDEBAR ─────────────────────────────────── */
+    .sidebar {
+      border-right: 1px solid var(--border); background: var(--bg);
+      padding: 10px; display: flex; flex-direction: column; gap: 10px;
+      overflow-y: auto; min-height: 0;
+    }
+    .sb-sec {
+      font-size: 9px; letter-spacing: 2px; color: var(--g4);
+      padding-bottom: 5px; border-bottom: 1px solid var(--border);
+    }
+
+    /* Captura control no sidebar */
+    .cap-ctrl { display: flex; flex-direction: column; gap: 6px; }
+    .freq-row { display: flex; gap: 5px; align-items: center; }
+    .freq-inp {
+      flex: 1; background: var(--bg2); border: 1px solid var(--border2);
+      color: var(--g); font-family: var(--font); font-size: 11px;
+      padding: 5px 8px; outline: none;
+    }
+    .freq-inp:focus { border-color: var(--g3); }
+    .cap-status {
+      display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+      border: 1px solid var(--border); background: var(--bg2);
+      font-size: 10px; color: var(--g3);
+    }
+    .cap-status.ativo { border-color: var(--border2); background: var(--bg3); color: var(--g); }
+
+    /* Torres */
+    .torre-lista { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+    .torre-item {
+      padding: 5px 7px; background: var(--bg2);
+      border: 1px solid var(--border); cursor: pointer; transition: border-color .15s;
+    }
+    .torre-item:hover  { border-color: var(--border2); }
+    .torre-item.sel    { border-color: var(--g3); background: var(--bg3); }
+    .t-top   { display: flex; justify-content: space-between; align-items: baseline; }
+    .t-freq  { font-size: 11px; color: var(--g); font-weight: 600; }
+    .t-dbm   { font-size: 9px; }
+    .t-meta  { font-size: 9px; color: var(--g4); margin-top: 1px; }
+    .t-bar   { height: 2px; background: var(--g4); margin-top: 3px; border-radius: 1px; overflow: hidden; }
+    .t-fill  { height: 100%; border-radius: 1px; }
+
+    .banda-chip {
+      font-size: 8px; font-weight: 700; padding: 1px 4px;
+      letter-spacing: .5px;
+    }
+    .gsm850  { color: #8DFF44; background: #0d1500; }
+    .gsm900  { color: var(--g);  background: var(--bg4); }
+    .dcs1800 { color: var(--b);  background: #001018; }
+
+    /* Filtros + ações */
+    .filter-row { display: flex; flex-direction: column; gap: 4px; }
+    .filter-lbl { font-size: 9px; color: var(--g4); letter-spacing: 1px; }
+    select.fsel {
+      background: var(--bg2); border: 1px solid var(--border2);
+      color: var(--g2); font-family: var(--font); font-size: 10px;
+      padding: 4px 6px; outline: none; width: 100%;
+    }
+    select.fsel:focus { border-color: var(--g3); }
+    select.fsel option { background: var(--bg2); }
+    input.fsearch {
+      background: var(--bg2); border: 1px solid var(--border2);
+      color: var(--g); font-family: var(--font); font-size: 10px;
+      padding: 4px 6px; outline: none; width: 100%;
+    }
+    input.fsearch:focus { border-color: var(--g3); }
+    input.fsearch::placeholder { color: var(--g4); }
+
+    .act-btn {
+      width: 100%; background: transparent; border: 1px solid var(--border);
+      color: var(--g3); font-family: var(--font); font-size: 9px;
+      padding: 5px 8px; cursor: pointer; letter-spacing: 1px;
+      text-align: left; transition: all .15s;
+    }
+    .act-btn:hover { border-color: var(--border2); color: var(--g); }
+
+    /* ── MAIN CONTENT ────────────────────────────── */
+    .main-content { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+
+    .panel-head {
+      background: var(--bg2); border-bottom: 1px solid var(--border);
+      padding: 6px 12px; display: flex; align-items: center; gap: 8px;
+      font-size: 9px; letter-spacing: 2px; color: var(--g2); flex-shrink: 0;
+    }
+    .ph-badge {
+      font-size: 9px; padding: 1px 5px;
+      border: 1px solid var(--border); color: var(--g3); letter-spacing: 1px;
+    }
+    .ph-badge.r { border-color: rgba(255,59,48,.3); color: var(--r); }
+    .ph-badge.y { border-color: rgba(245,216,0,.3);  color: var(--y); }
+    .ph-badge.b { border-color: rgba(79,175,255,.3);  color: var(--b); }
+    .ph-badge.g { border-color: var(--border2); color: var(--g); }
+
+    /* Tabela de capturas */
+    .tbl-wrap { overflow-y: auto; flex: 1; min-height: 0; }
+    table.cap-tbl { width: 100%; border-collapse: collapse; }
+    table.cap-tbl th {
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      padding: 5px 8px; font-size: 9px; letter-spacing: 1.5px;
+      color: var(--g4); font-weight: 600; white-space: nowrap;
+      position: sticky; top: 0; z-index: 1;
+    }
+    table.cap-tbl td {
+      padding: 4px 8px; border-bottom: 1px solid var(--bg3);
+      font-size: 11px; white-space: nowrap;
+    }
+    table.cap-tbl tr:hover td { background: var(--bg2); }
+    table.cap-tbl tr.novo td  { animation: fadeIn .6s ease; }
+    @keyframes fadeIn { from { background: rgba(71,223,127,.06); } to { background: transparent; } }
+
+    .ct-tipo   { font-weight: 700; font-size: 10px; }
+    .ct-imsi   { color: var(--g); }
+    .ct-tmsi   { color: var(--y); }
+    .ct-imei   { color: var(--b); }
+    .ct-val    { font-family: var(--font); letter-spacing: .5px; color: var(--g2); }
+    .ct-op     { color: var(--g3); }
+    .ct-mcc    { color: var(--g4); font-size: 10px; }
+    .ct-freq   { color: var(--p); }
+    .ct-dbm    { color: var(--g4); }
+    .ct-ts     { color: var(--g4); font-size: 10px; }
+
+    /* Timeline */
+    canvas.timeline {
+      width: 100%; height: 36px; display: block;
+      background: var(--bg); border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+
+    /* Export bar */
+    .export-bar {
+      display: flex; gap: 8px; padding: 6px 12px;
+      border-top: 1px solid var(--border); background: var(--bg); flex-shrink: 0;
+    }
+    .exp-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--g4);
+      font-family: var(--font); font-size: 9px; padding: 3px 9px;
+      cursor: pointer; letter-spacing: 1px;
+    }
+    .exp-btn:hover { border-color: var(--border2); color: var(--g); }
+
+    /* ── RIGHT PANEL ─────────────────────────────── */
+    .right-panel { display: flex; flex-direction: column; background: var(--bg); min-height: 0; overflow: hidden; }
+
+    /* Operadoras */
+    .op-list { display: flex; flex-direction: column; gap: 6px; padding: 10px; max-height: 160px; overflow-y: auto; }
+    .op-row  { display: flex; align-items: center; gap: 8px; }
+    .op-name { width: 64px; font-size: 9px; color: var(--g3); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .op-bar-wrap { flex: 1; height: 14px; background: var(--bg3); overflow: hidden; }
+    .op-bar { height: 100%; min-width: 2px; transition: width .5s; }
+    .op-cnt { width: 28px; text-align: right; font-size: 10px; color: var(--g2); }
+    .op-sub { font-size: 9px; color: var(--g4); width: 36px; }
+
+    /* Dispositivos */
+    .dev-lista { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; padding: 8px; }
+    .dev-item {
+      background: var(--bg2); border: 1px solid var(--border);
+      padding: 5px 8px; cursor: pointer; transition: border-color .15s;
+    }
+    .dev-item:hover { border-color: var(--border2); }
+    .dv-id   { font-size: 10px; font-weight: 600; }
+    .dv-meta { font-size: 9px; color: var(--g4); margin-top: 1px; }
+
+    /* Proto tabs */
+    .proto-tabs { display: flex; border-bottom: 1px solid var(--border); }
+    .proto-tab  {
+      padding: 6px 10px; font-size: 9px; letter-spacing: 1.5px;
+      cursor: pointer; border-bottom: 2px solid transparent;
+      color: var(--g4); transition: all .15s;
+    }
+    .proto-tab:hover { color: var(--g2); }
+    .proto-tab.sel   { color: var(--g); border-bottom-color: var(--g); }
+
+    .proto-body { padding: 8px; overflow-y: auto; flex: 1; font-size: 10px; min-height: 0; }
+
+    .vuln-item {
+      margin-bottom: 8px; padding: 7px 9px;
+      background: var(--bg2); border-left: 2px solid var(--border2);
+    }
+    .vl-title { color: var(--g2); font-size: 10px; font-weight: 600; margin-bottom: 2px; }
+    .vl-desc  { color: var(--g4); line-height: 1.6; }
+    .vl-cve   { font-size: 9px; color: var(--g4); margin-top: 2px; opacity: .7; }
+
+    .msg-flow { display: flex; flex-direction: column; gap: 2px; }
+    .msg-item { display: flex; gap: 7px; align-items: flex-start; padding: 4px 7px; background: var(--bg3); }
+    .msg-dir  { font-size: 9px; color: var(--g4); min-width: 14px; }
+    .msg-cmd  { font-size: 10px; color: var(--b); min-width: 75px; }
+    .msg-val  { font-size: 10px; color: var(--g3); flex: 1; }
+    .msg-ok   { font-size: 9px; color: var(--g); }
+    .msg-fail { font-size: 9px; color: var(--r); }
+
+    .aviso-legal {
+      background: var(--bg3); border: 1px solid var(--border);
+      padding: 7px 9px; margin-bottom: 7px;
+      font-size: 9px; color: var(--g4); line-height: 1.6;
+    }
+
+    /* ── EMPTY STATES ────────────────────────────── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px;
+      height: 100%; min-height: 200px;
+      color: var(--g4); font-size: 10px; letter-spacing: .5px;
+    }
+    .empty-state-icon { font-size: 28px; opacity: .3; }
+
+    /* Proto body vazio */
+    .proto-hint {
+      margin-top: 12px; padding: 8px;
+      font-size: 9px; color: var(--g4); line-height: 1.8;
+      border-top: 1px solid var(--border);
+    }
+    .proto-hint-line { display: flex; gap: 6px; align-items: baseline; }
+    .proto-hint-line::before { content: '//'; color: var(--y2); flex-shrink: 0; }
+
+    /* Auto-scroll check */
+    .chk-wrap {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 9px; color: var(--g4); cursor: pointer; user-select: none;
+    }
+    .chk-wrap input[type=checkbox] { accent-color: var(--g); width: 11px; height: 11px; cursor: pointer; }
+
+    /* ── SCROLLBARS ──────────────────────────────── */
+    ::-webkit-scrollbar { width: 3px; height: 3px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--g4); border-radius: 1px; }
+
+    /* ── TOAST ───────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: var(--bg2); border: 1px solid var(--border2);
+      padding: 8px 14px; font-size: 10px; color: var(--g);
+      letter-spacing: .5px; opacity: 0; transition: opacity .25s;
+      pointer-events: none; z-index: 9999; font-family: var(--font);
+    }
+    #toast.show { opacity: 1; }
+    #toast.err  { border-color: rgba(255,59,48,.5); color: var(--r); }
+  </style>
+</head>
+<body>
+
+<script src="nav.js"></script>
+
+<!-- ── Status Bar ─────────────────────────────────────────────────────────────── -->
+<div class="sbar">
+  <div class="si"><div class="dot" id="sDotHrf"></div><span class="si-lbl">HackRF</span><span class="si-val" id="sHrf">—</span></div>
+  <div class="si"><div class="dot" id="sDotGsm"></div><span class="si-lbl">gr-gsm</span><span class="si-val" id="sGsm">—</span></div>
+  <div class="si"><div class="dot" id="sDotWs"></div><span class="si-lbl">WS</span></div>
+  <div class="si" id="si-freq" style="display:none">
+    <span class="si-lbl">TESTANDO</span>
+    <span class="si-val" id="sFreq" style="color:var(--y)">—</span>
+  </div>
+  <div class="sbar-right">
+    <span style="font-size:9px;color:var(--g4)" id="sTs">—</span>
+    <button class="sb-btn start" id="btnStart" onclick="iniciarCaptura()">▶ INICIAR</button>
+    <button class="sb-btn stop"  id="btnStop"  onclick="pararCaptura()" style="display:none">■ PARAR</button>
+  </div>
+</div>
+
+<!-- ── Stats ──────────────────────────────────────────────────────────────────── -->
+<div class="stats">
+  <div class="stat-c"><div class="stat-n" id="stTotal" style="color:var(--g)">0</div><div class="stat-l">CAPTURAS</div></div>
+  <div class="stat-c"><div class="stat-n" id="stImsi"  style="color:var(--g)">0</div><div class="stat-l">IMSI</div></div>
+  <div class="stat-c"><div class="stat-n" id="stTmsi"  style="color:var(--y)">0</div><div class="stat-l">TMSI</div></div>
+  <div class="stat-c"><div class="stat-n" id="stImei"  style="color:var(--b)">0</div><div class="stat-l">IMEI</div></div>
+  <div class="stat-c"><div class="stat-n" id="stTorres" style="color:var(--p)">0</div><div class="stat-l">TORRES</div></div>
+  <div class="stat-c"><div class="stat-n" id="stDisp"  style="color:var(--o)">0</div><div class="stat-l">DISPOSITIVOS</div></div>
+</div>
+
+<!-- ── Layout ─────────────────────────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- SIDEBAR ────────────────────────────────────── -->
+  <div class="sidebar">
+
+    <!-- Captura control -->
+    <div class="sb-sec">CAPTURA GSM</div>
+    <div class="cap-ctrl">
+      <div class="freq-row">
+        <input class="freq-inp" type="number" id="freqInp"
+               placeholder="MHz (auto)" step="0.2" min="869" max="1880">
+        <button class="act-btn" style="width:auto;padding:4px 8px" onclick="scanTorres()">🔍</button>
+      </div>
+      <div class="cap-status" id="capStatus">
+        <div class="dot" id="dotCap"></div>
+        <span id="capMsg">Aguardando…</span>
+      </div>
+      <span id="hintGrgsm" style="display:none;font-size:9px;color:var(--r);line-height:1.5">
+        ✗ gr-gsm não instalado<br>Duplo clique em 📱 Instalar gr-gsm.command
+      </span>
+    </div>
+
+    <!-- Torres -->
+    <div class="sb-sec" style="display:flex;justify-content:space-between">
+      TORRES DETECTADAS
+      <span id="scanStatus" style="color:var(--g3)">—</span>
+    </div>
+    <div class="torre-lista" id="torreLista">
+      <div style="font-size:9px;color:var(--g4);padding:4px">Clique em 🔍 para varrer</div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="sb-sec">FILTROS</div>
+    <div class="filter-row">
+      <input class="fsearch" id="fBusca" placeholder="IMSI / TMSI / operadora…" oninput="filtrar()">
+    </div>
+    <div class="filter-row">
+      <span class="filter-lbl">TIPO</span>
+      <select class="fsel" id="fTipo" onchange="filtrar()">
+        <option value="">TODOS</option>
+        <option value="IMSI">IMSI</option>
+        <option value="TMSI">TMSI</option>
+        <option value="IMEI">IMEI</option>
+      </select>
+    </div>
+    <div class="filter-row">
+      <span class="filter-lbl">OPERADORA</span>
+      <select class="fsel" id="fOp" onchange="filtrar()">
+        <option value="">TODAS</option>
+      </select>
+    </div>
+
+    <!-- Ações -->
+    <div class="sb-sec">AÇÕES</div>
+    <button class="act-btn" onclick="limparCapturas()">🗑  LIMPAR CAPTURAS</button>
+    <button class="act-btn" onclick="exportarCSV()">📥  EXPORTAR CSV</button>
+    <button class="act-btn" onclick="exportarJSON()">📥  EXPORTAR JSON</button>
+  </div>
+
+  <!-- MAIN: CAPTURE TABLE ────────────────────────── -->
+  <div class="main-content">
+    <div class="panel-head">
+      CAPTURAS EM TEMPO REAL
+      <span class="ph-badge g" id="capCnt">0</span>
+      <label class="chk-wrap" style="margin-left:auto">
+        <input type="checkbox" id="chkAuto" checked> AUTO ↓
+      </label>
+    </div>
+
+    <div class="tbl-wrap" id="tblWrap">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-state-icon">📡</div>
+        <div style="color:var(--g3);letter-spacing:1px">AGUARDANDO CAPTURAS</div>
+        <div>Inicie — cada torre é testada 15s automaticamente</div>
+      </div>
+      <table class="cap-tbl" id="capTbl" style="display:none">
+        <thead>
+          <tr>
+            <th>TIPO</th><th>VALOR</th><th>OPERADORA</th>
+            <th>MCC/MNC</th><th>ARFCN</th><th>FREQ</th><th>dBm</th><th>HORA</th>
+          </tr>
+        </thead>
+        <tbody id="capBody"></tbody>
+      </table>
+    </div>
+
+    <canvas class="timeline" id="timelineCanvas" width="800" height="36"></canvas>
+
+    <div class="export-bar">
+      <span style="font-size:9px;color:var(--g4)">ÚLTIMO FRAME:</span>
+      <span style="font-size:9px;color:var(--g3);margin-left:4px" id="frameTs">—</span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL ────────────────────────────────── -->
+  <div class="right-panel">
+
+    <!-- Operadoras -->
+    <div class="panel-head" style="color:var(--y)">OPERADORAS</div>
+    <div class="op-list" id="opList">
+      <div style="font-size:9px;color:var(--g4);padding:4px">Sem dados</div>
+    </div>
+
+    <!-- Dispositivos -->
+    <div class="panel-head" style="color:var(--o)">
+      DISPOSITIVOS RASTREADOS
+      <span class="ph-badge" style="margin-left:auto" id="dispCnt">0</span>
+    </div>
+    <div class="dev-lista" id="devLista">
+      <div style="font-size:9px;color:var(--g4);padding:4px">Nenhum ainda</div>
+    </div>
+
+    <!-- Protocolo tabs -->
+    <div class="panel-head" style="color:var(--b)">ANÁLISE DE PROTOCOLO</div>
+    <div class="proto-tabs">
+      <div class="proto-tab sel" onclick="selTab(this,'tabGSM')">GSM/2G</div>
+      <div class="proto-tab"    onclick="selTab(this,'tabSS7')">SS7</div>
+      <div class="proto-tab"    onclick="selTab(this,'tabDiam')">DIAMETER</div>
+      <div class="proto-tab"    onclick="selTab(this,'tabLTE')">LTE/4G</div>
+    </div>
+
+    <!-- Tab GSM -->
+    <div class="proto-body" id="tabGSM">
+      <div class="aviso-legal">
+        ⚠ Uso educacional / pesquisa. Captura passiva de broadcasts GSM não criptografados (BCCH). Não intercepta chamadas ou SMS.
+      </div>
+      <div id="gsmInfo" style="color:var(--g4);font-size:9px;padding:4px">
+        Selecione uma torre para ver detalhes.
+      </div>
+      <div class="proto-hint">
+        <div class="proto-hint-line">GSM-850: 869 – 894 MHz (downlink)</div>
+        <div class="proto-hint-line">GSM-900: 935 – 960 MHz (downlink)</div>
+        <div class="proto-hint-line">DCS-1800: 1805 – 1880 MHz</div>
+        <div class="proto-hint-line">ARFCN resolve frequência exata do canal</div>
+        <div class="proto-hint-line">MCC 724 = Brasil · MNC = operadora</div>
+      </div>
+    </div>
+
+    <!-- Tab SS7 -->
+    <div class="proto-body" id="tabSS7" style="display:none">
+      <div class="aviso-legal">SS7 (GSMA FS.11) — vulnerabilidades conhecidas publicamente. Esta ferramenta não conecta a redes SS7.</div>
+      <div class="vuln-item">
+        <div class="vl-title">LOCALIZAÇÃO REMOTA</div>
+        <div class="vl-desc">SendRoutingInfoForSM expõe MSC/VLR onde o assinante está registrado.</div>
+        <div class="vl-cve">GSMA FS.11 · Category A</div>
+      </div>
+      <div class="vuln-item">
+        <div class="vl-title">INTERCEPTAÇÃO SMS</div>
+        <div class="vl-desc">Redirecionamento via MO-FSM no SMSC sem notificar o destinatário.</div>
+        <div class="vl-cve">GSMA FS.11 · Category A/B</div>
+      </div>
+      <div class="vuln-item">
+        <div class="vl-title">RASTREAMENTO</div>
+        <div class="vl-desc">ProvideSubscriberInfo ao HLR retorna Cell ID + LAC sem autenticação bilateral.</div>
+        <div class="vl-cve">GSMA FS.11 · Category A</div>
+      </div>
+      <div class="vuln-item" style="border-color:var(--y)">
+        <div class="vl-title" style="color:var(--y)">SIMULAÇÃO — FLUXO MAP</div>
+        <div class="msg-flow">
+          <div class="msg-item"><span class="msg-dir">→</span><span class="msg-cmd">sendRoutingInfo</span><span class="msg-val">MSISDN: +55 11 ****</span></div>
+          <div class="msg-item"><span class="msg-dir">←</span><span class="msg-cmd">routingInfoAck</span><span class="msg-val">MSC: 55011</span><span class="msg-ok">OK</span></div>
+          <div class="msg-item"><span class="msg-dir">→</span><span class="msg-cmd">provideSubInfo</span><span class="msg-val">IMSI: detectado</span></div>
+          <div class="msg-item"><span class="msg-dir">←</span><span class="msg-cmd">subInfoAck</span><span class="msg-val">LAC: 1234 · Cell: 5678</span><span class="msg-ok">OK</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Diameter -->
+    <div class="proto-body" id="tabDiam" style="display:none">
+      <div class="aviso-legal">Diameter (RFC 6733) — AAA em redes LTE/4G. Substitui RADIUS + SS7 MAP no core EPC.</div>
+      <div class="vuln-item">
+        <div class="vl-title">S6a: AIR/AIA (Authentication)</div>
+        <div class="vl-desc">Sem autenticação mútua robusta entre nós permite spoofing de MME falso.</div>
+        <div class="vl-cve">3GPP TS 29.272</div>
+      </div>
+      <div class="vuln-item">
+        <div class="vl-title">S6a: ULR/ULA (Location)</div>
+        <div class="vl-desc">Falso MME pode rastrear assinante e capturar IMSI via ULR forjado.</div>
+        <div class="vl-cve">3GPP TS 29.272</div>
+      </div>
+      <div class="vuln-item" style="border-color:var(--b)">
+        <div class="vl-title" style="color:var(--b)">SIMULAÇÃO — FLUXO DIAMETER</div>
+        <div class="msg-flow">
+          <div class="msg-item"><span class="msg-dir">→</span><span class="msg-cmd" style="color:var(--b)">AIR</span><span class="msg-val">IMSI · Auth-Type: EPS_AKA</span></div>
+          <div class="msg-item"><span class="msg-dir">←</span><span class="msg-cmd" style="color:var(--b)">AIA</span><span class="msg-val">RAND · AUTN · XRES</span><span class="msg-fail">⚠ exposto</span></div>
+          <div class="msg-item"><span class="msg-dir">→</span><span class="msg-cmd" style="color:var(--b)">ULR</span><span class="msg-val">IMSI · RAT: EUTRAN</span></div>
+          <div class="msg-item"><span class="msg-dir">←</span><span class="msg-cmd" style="color:var(--b)">ULA</span><span class="msg-val">Subscription-Data</span><span class="msg-ok">OK</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab LTE -->
+    <div class="proto-body" id="tabLTE" style="display:none">
+      <div class="aviso-legal">LTE/4G usa NAS entre UE e MME. IMSI pode ser exposto no Attach Request inicial.</div>
+      <div class="vuln-item" style="border-color:var(--g)">
+        <div class="vl-title" style="color:var(--g)">NAS: ATTACH REQUEST</div>
+        <div class="vl-desc">Se o UE não tiver GUTI válido, envia IMSI em texto plano. IMSI Catcher 4G explora este comportamento.</div>
+      </div>
+      <div class="vuln-item" style="border-color:var(--g)">
+        <div class="vl-title" style="color:var(--g)">IDENTITY REQUEST</div>
+        <div class="vl-desc">MME falso emite Identity Request após Attach com GUTI inválido forçando IMSI em plaintext.</div>
+      </div>
+      <div class="vuln-item" style="border-color:var(--p)">
+        <div class="vl-title" style="color:var(--p)">5G NR — SUCI</div>
+        <div class="vl-desc">5G usa SUCI (ECIES encryption). Mitiga IMSI catchers, mas handover para 4G/3G ainda ocorre.</div>
+      </div>
+    </div>
+
+  </div><!-- /right-panel -->
+</div><!-- /layout -->
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   SinalRF — Interceptação + IMSI Scanner unificado
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let _ws       = null;
+let _estado   = null;
+let _capturas = [];
+let _filtradas= [];
+let _dispMap  = {};
+let _torresVis= [];
+let _freqSel  = null;
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function conectar() {
+  _ws = new WebSocket(`ws://${location.host}/ws/imsi`);
+  setDot('sDotWs', 'busy');
+  _ws.onopen  = () => setDot('sDotWs', 'ok');
+  _ws.onclose = () => { setDot('sDotWs', 'err'); setTimeout(conectar, 3000); };
+  _ws.onerror = () => setDot('sDotWs', 'err');
+  _ws.onmessage = ev => {
+    try { _estado = JSON.parse(ev.data); render(_estado); } catch {}
+  };
+}
+
+// ── Render principal ──────────────────────────────────────────────────────────
+function render(d) {
+  // Status bar
+  setDot('sDotHrf', d.hackrf_ok ? 'ok' : 'err');
+  setDot('sDotGsm', d.grgsm_ok  ? 'ok' : 'err');
+  $('sHrf').textContent = d.hackrf_ok ? 'conectado' : 'off';
+  $('sGsm').textContent = d.grgsm_ok  ? 'ok' : 'não instalado';
+  $('sTs').textContent  = new Date(d.ts * 1000).toLocaleTimeString('pt-BR');
+  $('frameTs').textContent = new Date(d.ts * 1000).toLocaleString('pt-BR');
+  $('hintGrgsm').style.display = d.grgsm_ok ? 'none' : 'block';
+
+  // Freq atual (auto-scan)
+  const fAtual = d.freq_atual;
+  $('si-freq').style.display = (d.capturando && fAtual) ? '' : 'none';
+  if (fAtual) $('sFreq').textContent = fAtual + ' MHz';
+
+  // Start/Stop buttons
+  $('btnStart').style.display = d.capturando ? 'none' : '';
+  $('btnStop').style.display  = d.capturando ? '' : 'none';
+  $('btnStart').disabled = !d.grgsm_ok;
+
+  // Cap status
+  const capEl = $('capStatus');
+  capEl.className = 'cap-status' + (d.capturando ? ' ativo' : '');
+  setDot('dotCap', d.capturando ? 'ok' : (d.escaneando ? 'busy' : ''));
+  $('capMsg').textContent = d.capturando
+    ? (fAtual ? `SCAN ${fAtual} MHz` : 'CAPTURANDO…')
+    : (d.escaneando ? 'VARRENDO BANDAS…' : 'AGUARDANDO');
+
+  // Scan status
+  $('scanStatus').textContent = d.escaneando
+    ? '⟳ varrendo…'
+    : (d.torres?.length ? `${d.torres.length} torres` : '—');
+
+  // Stats
+  const s = d.stats || {};
+  $('stTotal').textContent  = d.n_unicos || 0;
+  $('stImsi').textContent   = s.imsi   || 0;
+  $('stTmsi').textContent   = s.tmsi   || 0;
+  $('stImei').textContent   = s.imei   || 0;
+  $('stTorres').textContent = (d.torres || []).length;
+
+  // Torres sidebar
+  if (d.torres?.length) {
+    _torresVis = d.torres;
+    renderTorres(d.torres);
+  }
+
+  // Novas capturas
+  const novas = (d.capturas || []).filter(c =>
+    !_capturas.find(x => x.ts === c.ts && x.valor === c.valor)
+  );
+  if (novas.length) {
+    _capturas = [..._capturas, ...novas].slice(-2000);
+    novas.forEach(rastrearDev);
+    filtrar();
+  }
+
+  // Dispositivos
+  $('stDisp').textContent = Object.keys(_dispMap).length;
+  renderDevs();
+
+  // Operadoras
+  renderOps(d.operadoras || {});
+
+  desenharTimeline();
+}
+
+// ── Torres sidebar ────────────────────────────────────────────────────────────
+function renderTorres(torres) {
+  if (!torres.length) return;
+  $('torreLista').innerHTML = torres.slice(0, 20).map(t => {
+    const pct   = Math.round(Math.max(0, Math.min(100, (t.dbm + 100) * 2.5)));
+    const cor   = t.dbm > -70 ? 'var(--g)' : t.dbm > -85 ? 'var(--y)' : 'var(--r)';
+    const band  = t.banda.replace('-','').toLowerCase();
+    const sel   = _freqSel == t.freq_mhz ? ' sel' : '';
+    return `<div class="torre-item${sel}" onclick="selecionarTorre(${t.freq_mhz}, ${JSON.stringify(t).replace(/"/g,"'")})">
+      <div class="t-top">
+        <span class="t-freq">${t.freq_mhz} <span class="banda-chip ${band}">${t.banda}</span></span>
+        <span class="t-dbm" style="color:${cor}">${t.dbm} dBm</span>
+      </div>
+      <div class="t-meta">ARFCN ${t.arfcn} · ${t.operadora || '?'}</div>
+      <div class="t-bar"><div class="t-fill" style="width:${pct}%;background:${cor}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function selecionarTorre(freq, torre) {
+  _freqSel = freq;
+  $('freqInp').value = freq;
+  renderTorres(_torresVis);
+
+  // Painel GSM info
+  $('gsmInfo').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div class="msg-item"><span class="msg-cmd" style="color:var(--g)">FREQ</span><span class="msg-val">${freq} MHz</span></div>
+      <div class="msg-item"><span class="msg-cmd" style="color:var(--g)">ARFCN</span><span class="msg-val">${torre.arfcn || '—'}</span></div>
+      <div class="msg-item"><span class="msg-cmd" style="color:var(--g)">BANDA</span><span class="msg-val">${torre.banda || '—'}</span></div>
+      <div class="msg-item"><span class="msg-cmd" style="color:var(--g)">SINAL</span><span class="msg-val">${torre.dbm} dBm</span></div>
+      <div class="msg-item"><span class="msg-cmd" style="color:var(--g)">MCC</span><span class="msg-val">${torre.mcc || '—'}</span></div>
+      <div class="msg-item"><span class="msg-cmd" style="color:var(--g)">LAC</span><span class="msg-val">${torre.lac || '—'}</span></div>
+    </div>`;
+
+  toast(`Torre: ${freq} MHz (${torre.dbm} dBm)`);
+}
+
+// ── Operadoras ────────────────────────────────────────────────────────────────
+function renderOps(ops) {
+  const el    = $('opList');
+  const lista = Object.entries(ops).sort((a,b) => b[1].n - a[1].n);
+  if (!lista.length) {
+    el.innerHTML = '<div style="font-size:9px;color:var(--g4);padding:4px">Sem dados</div>';
+    return;
+  }
+  const maxN = Math.max(...lista.map(([,v]) => v.n), 1);
+  el.innerHTML = lista.map(([nome, v]) => {
+    const pct = Math.round((v.n / maxN) * 100);
+    return `<div class="op-row">
+      <div class="op-name" style="color:${v.cor}" title="${nome}">${nome}</div>
+      <div class="op-bar-wrap"><div class="op-bar" style="width:${pct}%;background:${v.cor}44;border-right:2px solid ${v.cor}"></div></div>
+      <div class="op-cnt">${v.n}</div>
+      <div class="op-sub">${v.imsi||0}I ${v.tmsi||0}T</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Device tracking ───────────────────────────────────────────────────────────
+function rastrearDev(c) {
+  if (!c.valor || c.valor.length < 4) return;
+  if (!_dispMap[c.valor]) {
+    _dispMap[c.valor] = { tipo: c.tipo, valor: c.valor, ops: new Set(), freqs: new Set(), count: 0, first: c.ts, last: c.ts };
+  }
+  const d = _dispMap[c.valor];
+  d.count++; d.last = c.ts;
+  if (c.operadora) d.ops.add(c.operadora);
+  if (c.arfcn)     d.freqs.add(c.arfcn);
+}
+
+function renderDevs() {
+  const lista = $('devLista');
+  const devs  = Object.values(_dispMap).sort((a,b) => b.count - a.count).slice(0, 25);
+  if (!devs.length) {
+    lista.innerHTML = '<div style="font-size:9px;color:var(--g4);padding:4px">Nenhum ainda</div>';
+    $('dispCnt').textContent = 0;
+    return;
+  }
+  lista.innerHTML = devs.map(d => {
+    const cor  = d.tipo === 'IMSI' ? 'var(--g)' : d.tipo === 'TMSI' ? 'var(--y)' : 'var(--b)';
+    const ops  = [...d.ops].join(', ') || '—';
+    const last = new Date(d.last * 1000).toLocaleTimeString('pt-BR');
+    return `<div class="dev-item">
+      <div class="dv-id" style="color:${cor}">${d.tipo}: ${d.valor} <span style="float:right;color:${cor};font-size:9px">${d.count}×</span></div>
+      <div class="dv-meta">${ops} · ${last}</div>
+    </div>`;
+  }).join('');
+  $('dispCnt').textContent = devs.length;
+}
+
+// ── Filtros ───────────────────────────────────────────────────────────────────
+function filtrar() {
+  const busca = $('fBusca').value.toLowerCase();
+  const tipo  = $('fTipo').value;
+  const op    = $('fOp').value;
+  _filtradas  = _capturas.filter(c => {
+    if (tipo && c.tipo !== tipo)          return false;
+    if (op   && c.operadora !== op)       return false;
+    if (busca && !`${c.valor} ${c.operadora} ${c.mcc||''} ${c.mnc||''}`.toLowerCase().includes(busca)) return false;
+    return true;
+  });
+  renderTabela();
+  // Atualiza select operadoras
+  const ops  = [...new Set(_capturas.map(c => c.operadora).filter(Boolean))];
+  const sel  = $('fOp');
+  const cur  = sel.value;
+  sel.innerHTML = '<option value="">TODAS</option>' + ops.map(o => `<option value="${o}">${o}</option>`).join('');
+  sel.value = cur;
+}
+
+function renderTabela() {
+  const body  = $('capBody');
+  const lista = _filtradas.slice(-500).reverse();
+  const empty = $('emptyState'), tbl = $('capTbl');
+  if (!lista.length) {
+    if (empty) empty.style.display = 'flex';
+    if (tbl)   tbl.style.display   = 'none';
+    $('capCnt').textContent = 0;
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  if (tbl)   tbl.style.display   = 'table';
+  body.innerHTML = lista.map((c, i) => {
+    const tipoCls = c.tipo === 'IMSI' ? 'ct-imsi' : c.tipo === 'TMSI' ? 'ct-tmsi' : 'ct-imei';
+    const ts   = new Date(c.ts * 1000).toLocaleTimeString('pt-BR');
+    const dbm  = c.dbm  != null ? c.dbm.toFixed(0) : '—';
+    const freq = c.freq_mhz ? c.freq_mhz.toFixed(1) : (c.arfcn ? '': '—');
+    return `<tr class="${i === 0 ? 'novo' : ''}">
+      <td><span class="ct-tipo ${tipoCls}">${c.tipo}</span></td>
+      <td class="ct-val">${fmt(c.tipo, c.valor)}</td>
+      <td class="ct-op">${c.operadora || '—'}</td>
+      <td class="ct-mcc">${c.mcc||'—'}/${c.mnc||'—'}</td>
+      <td style="color:var(--g4)">${c.arfcn ?? '—'}</td>
+      <td class="ct-freq">${freq ? freq + ' MHz' : '—'}</td>
+      <td class="ct-dbm">${dbm}</td>
+      <td class="ct-ts">${ts}</td>
+    </tr>`;
+  }).join('');
+  $('capCnt').textContent = lista.length;
+  if ($('chkAuto').checked) $('tblWrap').scrollTop = 0;
+}
+
+function fmt(tipo, val) {
+  if (!val) return '—';
+  if (tipo === 'IMSI' && val.length === 15) return `${val.slice(0,3)} ${val.slice(3,5)} ${val.slice(5)}`;
+  if (tipo === 'TMSI' && val.length === 8)  return val.match(/.{2}/g).join(' ');
+  return val;
+}
+
+// ── Timeline ──────────────────────────────────────────────────────────────────
+function desenharTimeline() {
+  const cv  = $('timelineCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#000';
+  ctx.fillRect(0, 0, W, H);
+  if (!_capturas.length) return;
+  const agora = Date.now() / 1000, janela = 120;
+  _capturas.filter(c => agora - c.ts < janela).forEach(c => {
+    const x   = ((c.ts - (agora - janela)) / janela) * W;
+    const cor = c.tipo === 'IMSI' ? '#47DF7F' : c.tipo === 'TMSI' ? '#F5D800' : '#4FAFFF';
+    ctx.fillStyle = cor; ctx.globalAlpha = .7;
+    ctx.fillRect(x, 2, 2, H - 4);
+  });
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = 'rgba(71,223,127,.15)'; ctx.font = '9px JetBrains Mono,monospace';
+  ctx.fillText('−2min', 4, H - 4);
+  ctx.fillText('agora', W - 38, H - 4);
+}
+
+// ── Ações ─────────────────────────────────────────────────────────────────────
+async function iniciarCaptura() {
+  const freq = $('freqInp').value || null;
+  const url  = freq ? `/api/imsi/start?freq_mhz=${freq}` : '/api/imsi/start';
+  const r    = await api('POST', url);
+  if (r.ok) {
+    _freqSel = freq ? parseFloat(freq) : null;
+    toast(freq ? `▶ Capturando em ${freq} MHz` : '▶ Auto-scan iniciado');
+  } else {
+    toast('✗ ' + (r.detail || r.msg || 'Erro'), true);
+  }
+}
+
+async function pararCaptura() {
+  await api('POST', '/api/imsi/stop');
+  toast('■ Captura parada');
+}
+
+async function scanTorres() {
+  const r = await api('POST', '/api/imsi/scan');
+  if (r.ok) toast('🔍 Varrendo bandas GSM — aguarde ~30s');
+  else toast('✗ ' + (r.detail || 'Erro'), true);
+}
+
+async function limparCapturas() {
+  if (!confirm('Limpar todas as capturas?')) return;
+  _capturas = []; _filtradas = []; _dispMap = {};
+  await api('POST', '/api/imsi/limpar');
+  renderTabela(); renderDevs();
+  toast('🗑 Limpo');
+}
+
+function exportarCSV() {
+  const h = 'tipo,valor,operadora,mcc,mnc,arfcn,freq_mhz,dbm,horario\n';
+  const r = _capturas.map(c =>
+    [c.tipo,c.valor,c.operadora||'',c.mcc||'',c.mnc||'',c.arfcn||'',c.freq_mhz||'',c.dbm||'',
+     new Date(c.ts*1000).toISOString()].join(',')
+  ).join('\n');
+  baixar('imsi_capturas.csv', h + r, 'text/csv');
+}
+
+function exportarJSON() {
+  baixar('imsi_capturas.json', JSON.stringify(_capturas, null, 2), 'application/json');
+}
+
+function baixar(nome, conteudo, tipo) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
+  a.download = nome; a.click();
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function selTab(btn, id) {
+  document.querySelectorAll('.proto-tab').forEach(t => t.classList.remove('sel'));
+  ['tabGSM','tabSS7','tabDiam','tabLTE'].forEach(t => {
+    const el = $(t); if (el) el.style.display = 'none';
+  });
+  btn.classList.add('sel');
+  $(id).style.display = 'block';
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+
+function setDot(id, cls) {
+  const d = $(id); if (d) d.className = 'dot' + (cls ? ' ' + cls : '');
+}
+
+let _toastT;
+function toast(msg, err, dur) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className   = 'show' + (err ? ' err' : '');
+  clearTimeout(_toastT);
+  _toastT = setTimeout(() => el.classList.remove('show'), dur || 3500);
+}
+
+async function api(method, url) {
+  try { const r = await fetch(url, { method }); return await r.json(); }
+  catch (e) { return { ok: false, detail: String(e) }; }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+conectar();
+setInterval(desenharTimeline, 2000);
+</script>
+</body>
+</html>

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RadarWifi — Sensor de Áudio</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg:     #070b12; --bg2: #0d1320; --bg3: #111825;
+      --cyan:   #00d4ff; --green: #00ff88; --red: #ff3366;
+      --amber:  #ffaa00; --purple: #a855f7;
+      --muted:  #475569; --dim: #1e293b;
+      --text:   #e2e8f0;
+      --border: rgba(0,212,255,0.12);
+    }
+    html,body { background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px; height: 100%; }
+
+    /* ── layout ── */
+    .app { display: flex; flex-direction: column; min-height: 100vh;
+           max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+    /* ── dispositivo ── */
+    .dispositivo {
+      margin: 16px 0 0;
+      padding: 10px 16px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .dev-nome { font-size: 13px; color: var(--cyan); font-weight: 600; }
+    .dev-db   { font-size: 12px; color: var(--muted); }
+    .dev-dot  { width: 8px; height: 8px; border-radius: 50%;
+                background: var(--dim); transition: all .3s; }
+    .dev-dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+    /* ── grid principal ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 14px; padding: 16px 0; flex: 1;
+    }
+
+    /* ── cards ── */
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .card-titulo {
+      font-size: 11px; font-weight: 600; letter-spacing: .7px;
+      text-transform: uppercase; color: var(--muted);
+      display: flex; align-items: center; gap: 7px;
+    }
+
+    /* ── forma de onda ── (span 3 colunas) */
+    .card-onda { grid-column: 1 / 4; }
+    .card-radar { grid-column: 3; grid-row: 1 / 3; }
+
+    /* ── canvas ── */
+    .canvas-wrap { background: rgba(0,0,0,.35); border: 1px solid var(--border);
+                   border-radius: 8px; overflow: hidden; }
+    canvas { display: block; width: 100%; height: auto; }
+
+    /* ── número grande ── */
+    .num { font-size: 38px; font-weight: 700; font-variant-numeric: tabular-nums;
+           letter-spacing: -1px; }
+    .num-resp  { color: var(--green);  text-shadow: 0 0 18px rgba(0,255,136,.4); }
+    .num-card  { color: var(--red);    text-shadow: 0 0 18px rgba(255,51,102,.4); }
+    .num-dist  { color: var(--amber);  text-shadow: 0 0 18px rgba(255,170,0,.4); }
+    .unidade   { font-size: 14px; color: var(--muted); margin-left: 4px; }
+
+    /* ── barra confiança ── */
+    .barra-track { height: 4px; background: rgba(255,255,255,.05); border-radius: 2px; }
+    .barra-fill  { height: 100%; border-radius: 2px; transition: width .5s; }
+    .bf-resp  { background: var(--green); }
+    .bf-card  { background: var(--red); }
+
+    /* ── sub infos ── */
+    .row { display: flex; gap: 16px; }
+    .info { display: flex; flex-direction: column; gap: 2px; }
+    .info .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+    .info .valor { font-size: 12px; color: var(--text); }
+
+    /* ── fonte badge ── */
+    .fonte-tag {
+      font-size: 9px; font-weight: 600; letter-spacing: .6px;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 10px;
+      background: rgba(168,85,247,.15); color: var(--purple);
+      border: 1px solid rgba(168,85,247,.3);
+    }
+    .fonte-tag.wifi { background: rgba(0,212,255,.12); color: var(--cyan);
+                      border-color: rgba(0,212,255,.3); }
+
+    /* ── radar acústico ── */
+    .radar-canvas-wrap {
+      position: relative; border-radius: 8px; overflow: hidden;
+      background: rgba(0,0,0,.4); border: 1px solid var(--border);
+    }
+    #radarCanvas { display: block; }
+
+    /* ── lista de distâncias ── */
+    .dists { display: flex; flex-wrap: wrap; gap: 8px; }
+    .dist-chip {
+      background: rgba(255,170,0,.1); border: 1px solid rgba(255,170,0,.3);
+      border-radius: 8px; padding: 4px 10px;
+      font-size: 13px; font-weight: 600; color: var(--amber);
+    }
+
+    /* ── footer ── */
+    footer { display: flex; gap: 8px; align-items: center;
+             padding: 10px 0 16px; border-top: 1px solid var(--border);
+             font-size: 11px; color: var(--muted); }
+    .sep { opacity: .4; }
+  </style>
+</head>
+<body>
+<script src="nav.js"></script>
+<div class="app">
+
+  <!-- Dispositivo -->
+  <div class="dispositivo">
+    <span class="dev-dot" id="devDot"></span>
+    <span class="dev-nome" id="devNome">Conectando…</span>
+    <span class="dev-db"   id="devDb">— dB</span>
+    <span id="devFonte" class="fonte-tag">—</span>
+    <span style="flex:1"></span>
+    <span id="airpodsHint" style="display:none;font-size:11px;color:var(--amber)">
+      💡 Conecte os AirPods Pro via Bluetooth e selecione em <strong>Ajustes de Som → Entrada</strong> para melhor precisão nos batimentos
+    </span>
+  </div>
+
+  <div class="grid">
+
+    <!-- ── RESPIRAÇÃO ─────────────────────────────────── -->
+    <div class="card">
+      <div class="card-titulo">🫁 Respiração</div>
+      <div class="canvas-wrap">
+        <canvas id="respCanvas" width="320" height="90"></canvas>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:4px">
+        <span class="num num-resp" id="respBpm">—</span>
+        <span class="unidade">rpm</span>
+        <span class="fonte-tag" id="respFonte" style="margin-left:8px">—</span>
+      </div>
+      <div class="barra-track">
+        <div class="barra-fill bf-resp" id="respBarra" style="width:0%"></div>
+      </div>
+      <div class="row">
+        <div class="info"><span class="label">Confiança</span><span class="valor" id="respConf">0%</span></div>
+        <div class="info"><span class="label">Normal</span><span class="valor">12 – 20 rpm</span></div>
+        <div class="info"><span class="label">Fonte áudio</span><span class="valor" id="respAudioBpm">—</span></div>
+      </div>
+    </div>
+
+    <!-- ── BATIMENTOS ─────────────────────────────────── -->
+    <div class="card">
+      <div class="card-titulo">❤️ Batimentos</div>
+      <div class="canvas-wrap">
+        <canvas id="cardCanvas" width="320" height="90"></canvas>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:4px">
+        <span class="num num-card" id="cardBpm">—</span>
+        <span class="unidade">bpm</span>
+        <span class="fonte-tag" id="cardFonte" style="margin-left:8px">—</span>
+      </div>
+      <div class="barra-track">
+        <div class="barra-fill bf-card" id="cardBarra" style="width:0%"></div>
+      </div>
+      <div class="row">
+        <div class="info"><span class="label">Confiança</span><span class="valor" id="cardConf">0%</span></div>
+        <div class="info"><span class="label">Normal</span><span class="valor">50 – 100 bpm</span></div>
+        <div class="info"><span class="label">Fonte áudio</span><span class="valor" id="cardAudioBpm">—</span></div>
+      </div>
+      <p style="font-size:10px;color:var(--muted)">⚠ In-ear (AirPods Pro): melhor precisão</p>
+    </div>
+
+    <!-- ── RADAR ACÚSTICO ─────────────────────────────── -->
+    <div class="card card-radar">
+      <div class="card-titulo">📡 Radar Acústico</div>
+      <div class="radar-canvas-wrap">
+        <canvas id="radarCanvas" width="260" height="260"></canvas>
+      </div>
+      <div class="dists" id="distsList">
+        <span style="font-size:11px;color:var(--muted)">aguardando varredura…</span>
+      </div>
+      <div class="row">
+        <div class="info">
+          <span class="label">Próximo objeto</span>
+          <span class="valor num-dist" id="distMin" style="font-size:20px">—</span>
+        </div>
+        <div class="info">
+          <span class="label">Superfícies</span>
+          <span class="valor" id="nDists">—</span>
+        </div>
+      </div>
+      <p style="font-size:10px;color:var(--muted)">Chirp 1.5–7.5 kHz → mede distâncias por eco</p>
+    </div>
+
+    <!-- ── FORMA DE ONDA (linha inteira) ─────────────────────────────── -->
+    <div class="card card-onda">
+      <div class="card-titulo">📊 Forma de Onda do Microfone</div>
+      <div class="canvas-wrap">
+        <canvas id="ondaCanvas" width="900" height="80"></canvas>
+      </div>
+      <div class="row">
+        <div class="info"><span class="label">Dispositivo</span><span class="valor" id="devNome2">—</span></div>
+        <div class="info"><span class="label">Volume</span><span class="valor" id="devDb2">— dB</span></div>
+        <div class="info"><span class="label">Resp (áudio)</span><span class="valor" id="respATag">—</span></div>
+        <div class="info"><span class="label">Card (áudio)</span><span class="valor" id="cardATag">—</span></div>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+
+  <footer>
+    <span>RadarWifi v1.0</span><span class="sep">·</span>
+    <span id="fpsLabel">—</span><span class="sep">·</span>
+    <span id="wsLabel">conectando…</span>
+  </footer>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+//  RadarWifi — Painel de Áudio
+// ════════════════════════════════════════════════════════════════════
+
+// ── WebSocket ────────────────────────────────────────────────────────
+let ws = null, frame = null;
+let tUlt = performance.now(), fps = 0;
+
+function conectar() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = e => {
+    try {
+      frame = JSON.parse(e.data);
+      atualizarHUD(frame);
+      const agora = performance.now();
+      fps = Math.round(1000 / (agora - tUlt));
+      tUlt = agora;
+      document.getElementById('fpsLabel').textContent = `${fps} fps`;
+    } catch(_) {}
+  };
+  ws.onopen  = () => { document.getElementById('wsLabel').textContent = '🟢 conectado'; };
+  ws.onclose = () => { document.getElementById('wsLabel').textContent = '🔴 reconectando…'; setTimeout(conectar, 2000); };
+}
+conectar();
+
+// ── HUD ──────────────────────────────────────────────────────────────
+function atualizarHUD(f) {
+  if (!f.audio) return;
+  const a = f.audio;
+
+  // Dispositivo
+  const ativo = a.amplitude_db > -70;
+  document.getElementById('devDot').className   = 'dev-dot' + (ativo ? ' on' : '');
+  document.getElementById('devNome').textContent = a.dispositivo || '—';
+  document.getElementById('devNome2').textContent= a.dispositivo || '—';
+  document.getElementById('devDb').textContent   = `${a.amplitude_db} dB`;
+  document.getElementById('devDb2').textContent  = `${a.amplitude_db} dB`;
+
+  const isAirpods = a.is_airpods || a.dispositivo.toLowerCase().includes('airpod');
+  const fonteTag  = document.getElementById('devFonte');
+  fonteTag.textContent = isAirpods ? '🎧 AirPods Pro' : '🎙 Mic Mac';
+  fonteTag.className   = 'fonte-tag' + (isAirpods ? '' : ' wifi');
+
+  // Mostrar dica se não for AirPods
+  document.getElementById('airpodsHint').style.display = isAirpods ? 'none' : 'inline';
+
+  // Respiração
+  const resp = f.respiracao;
+  document.getElementById('respBpm').textContent  = resp.bpm > 0 ? resp.bpm.toFixed(1) : '—';
+  document.getElementById('respConf').textContent = `${Math.round(resp.confianca * 100)}%`;
+  document.getElementById('respBarra').style.width= `${Math.round(resp.confianca * 100)}%`;
+  document.getElementById('respFonte').textContent = resp.fonte || '—';
+  document.getElementById('respFonte').className  = 'fonte-tag' + (resp.fonte === 'wifi' ? ' wifi' : '');
+  document.getElementById('respAudioBpm').textContent =
+    a.resp_audio?.bpm > 0 ? `${a.resp_audio.bpm} rpm (${Math.round((a.resp_audio.confianca||0)*100)}%)` : '—';
+  document.getElementById('respATag').textContent  =
+    a.resp_audio?.bpm > 0 ? `${a.resp_audio.bpm} rpm` : '—';
+
+  // Batimentos
+  const card = f.batimentos;
+  document.getElementById('cardBpm').textContent  = card.bpm > 0 ? card.bpm.toFixed(0) : '—';
+  document.getElementById('cardConf').textContent = `${Math.round(card.confianca * 100)}%`;
+  document.getElementById('cardBarra').style.width= `${Math.round(card.confianca * 100)}%`;
+  document.getElementById('cardFonte').textContent = card.fonte || '—';
+  document.getElementById('cardFonte').className  = 'fonte-tag' + (card.fonte === 'wifi' ? ' wifi' : '');
+  document.getElementById('cardAudioBpm').textContent =
+    a.card_audio?.bpm > 0 ? `${a.card_audio.bpm} bpm (${Math.round((a.card_audio.confianca||0)*100)}%)` : '—';
+  document.getElementById('cardATag').textContent  =
+    a.card_audio?.bpm > 0 ? `${a.card_audio.bpm} bpm` : '—';
+
+  // Radar — distâncias
+  const radar = a.radar || {};
+  const dists = radar.distancias || [];
+  const listaEl = document.getElementById('distsList');
+  if (dists.length > 0) {
+    listaEl.innerHTML = dists.map(d => `<span class="dist-chip">${d}m</span>`).join('');
+    document.getElementById('distMin').textContent = dists[0] + 'm';
+    document.getElementById('nDists').textContent  = dists.length;
+  } else {
+    listaEl.innerHTML = '<span style="font-size:11px;color:var(--muted)">aguardando varredura…</span>';
+    document.getElementById('distMin').textContent = '—';
+    document.getElementById('nDists').textContent  = '—';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Canvas: Forma de Onda
+// ════════════════════════════════════════════════════════════════════
+const cOnd = document.getElementById('ondaCanvas');
+const xOnd = cOnd.getContext('2d');
+
+function desenharOnda(onda) {
+  const w = cOnd.width, h = cOnd.height;
+  xOnd.clearRect(0, 0, w, h);
+  if (!onda || onda.length < 2) return;
+
+  const mx = Math.max(...onda.map(Math.abs)) || 0.001;
+  const px  = i => (i / (onda.length - 1)) * w;
+  const py  = v => h / 2 - (v / mx) * (h / 2 - 4);
+
+  // Fundo
+  xOnd.fillStyle = 'rgba(0,212,255,0.03)';
+  xOnd.fillRect(0, 0, w, h);
+
+  // Linha central
+  xOnd.strokeStyle = 'rgba(0,212,255,0.08)';
+  xOnd.lineWidth = 1;
+  xOnd.beginPath(); xOnd.moveTo(0, h/2); xOnd.lineTo(w, h/2); xOnd.stroke();
+
+  // Forma de onda
+  const grad = xOnd.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0,   'rgba(0,212,255,0.3)');
+  grad.addColorStop(0.7, '#00d4ff');
+  grad.addColorStop(1,   '#00ff88');
+
+  xOnd.beginPath();
+  onda.forEach((v, i) => i === 0 ? xOnd.moveTo(px(i), py(v)) : xOnd.lineTo(px(i), py(v)));
+  xOnd.strokeStyle = grad;
+  xOnd.lineWidth   = 1.5;
+  xOnd.shadowColor = '#00d4ff';
+  xOnd.shadowBlur  = 5;
+  xOnd.stroke();
+  xOnd.shadowBlur  = 0;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Canvas: Respiração (onda senoidal animada)
+// ════════════════════════════════════════════════════════════════════
+const cResp = document.getElementById('respCanvas');
+const xResp = cResp.getContext('2d');
+let tResp = 0;
+
+function animarResp() {
+  const w = cResp.width, h = cResp.height;
+  xResp.clearRect(0, 0, w, h);
+  const bpm  = frame?.respiracao?.bpm  || 0;
+  const conf = frame?.respiracao?.confianca || 0;
+  if (bpm <= 0) { desenharPlano(xResp, w, h, '#00ff88'); return; }
+
+  tResp += 0.016 * (bpm / 60) * 2;
+  const amp = (h / 2 - 6) * Math.min(1, conf * 2 + 0.3);
+
+  xResp.beginPath();
+  for (let x = 0; x <= w; x++) {
+    const t = tResp + (x / w) * 2;
+    const y = h/2 - amp * Math.sin(2 * Math.PI * (bpm/60) * t);
+    x === 0 ? xResp.moveTo(x, y) : xResp.lineTo(x, y);
+  }
+  xResp.strokeStyle = '#00ff88';
+  xResp.lineWidth   = 2.5;
+  xResp.shadowColor = '#00ff88';
+  xResp.shadowBlur  = 8;
+  xResp.stroke();
+  xResp.shadowBlur  = 0;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Canvas: Batimentos (ECG sintético)
+// ════════════════════════════════════════════════════════════════════
+const cCard = document.getElementById('cardCanvas');
+const xCard = cCard.getContext('2d');
+let tCard = 0;
+
+function ecg(fase) {
+  if (fase < 0.08) return 0.4 * Math.sin((fase / 0.08) * Math.PI);
+  if (fase < 0.14) return -0.15;
+  if (fase < 0.17) return 3.5 * Math.sin(((fase-0.14)/0.03) * Math.PI);
+  if (fase < 0.22) return -0.35 * Math.sin(((fase-0.17)/0.05) * Math.PI);
+  if (fase < 0.48) return 0.55 * Math.sin(((fase-0.22)/0.26) * Math.PI);
+  return 0;
+}
+
+function animarCard() {
+  const w = cCard.width, h = cCard.height;
+  xCard.clearRect(0, 0, w, h);
+  const bpm  = frame?.batimentos?.bpm  || 0;
+  const conf = frame?.batimentos?.confianca || 0;
+  if (bpm <= 0) { desenharPlano(xCard, w, h, '#ff3366'); return; }
+
+  tCard += 0.016 * (bpm / 60) * 2;
+  const escala = (h/2 - 6) * 0.35 * Math.min(1, conf * 3 + 0.2);
+
+  xCard.beginPath();
+  for (let x = 0; x <= w; x++) {
+    const t    = tCard + (x / w) * 3;
+    const fase = (t * (bpm/60)) % 1;
+    const y    = h/2 - escala * ecg(fase);
+    x === 0 ? xCard.moveTo(x, y) : xCard.lineTo(x, y);
+  }
+  xCard.strokeStyle = '#ff3366';
+  xCard.lineWidth   = 2;
+  xCard.shadowColor = '#ff3366';
+  xCard.shadowBlur  = 8;
+  xCard.stroke();
+  xCard.shadowBlur  = 0;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Canvas: Radar acústico (anéis de distância)
+// ════════════════════════════════════════════════════════════════════
+const cRad = document.getElementById('radarCanvas');
+const xRad = cRad.getContext('2d');
+let tRadar = 0;
+
+function desenharRadar() {
+  const w = cRad.width, h = cRad.height;
+  const cx = w/2, cy = h/2;
+  const R = Math.min(w, h) / 2 - 10;
+  const DIST_MAX = 6.0;   // metros
+
+  xRad.clearRect(0, 0, w, h);
+
+  // Fundo circular
+  const bg = xRad.createRadialGradient(cx, cy, 0, cx, cy, R);
+  bg.addColorStop(0,   'rgba(0,170,100,0.05)');
+  bg.addColorStop(1,   'rgba(0,0,0,0)');
+  xRad.fillStyle = bg;
+  xRad.beginPath(); xRad.arc(cx, cy, R, 0, Math.PI*2); xRad.fill();
+
+  // Anéis de referência com labels de distância
+  [1, 2, 3, 4, 5].forEach(d => {
+    const r = (d / DIST_MAX) * R;
+    xRad.beginPath();
+    xRad.arc(cx, cy, r, 0, Math.PI*2);
+    xRad.strokeStyle = 'rgba(0,212,255,0.08)';
+    xRad.lineWidth = 1;
+    xRad.stroke();
+    xRad.fillStyle = 'rgba(0,212,255,0.3)';
+    xRad.font = '9px monospace';
+    xRad.fillText(`${d}m`, cx + r + 2, cy - 2);
+  });
+
+  // Cruz
+  xRad.strokeStyle = 'rgba(0,212,255,0.06)';
+  xRad.lineWidth = 1;
+  xRad.beginPath(); xRad.moveTo(cx, cy-R); xRad.lineTo(cx, cy+R); xRad.stroke();
+  xRad.beginPath(); xRad.moveTo(cx-R, cy); xRad.lineTo(cx+R, cy); xRad.stroke();
+
+  // Varredor
+  tRadar += 0.012;
+  const sweep = xRad.createConicalGradient ? null : null;
+  xRad.save();
+  xRad.translate(cx, cy);
+  xRad.rotate(tRadar);
+  const sg = xRad.createLinearGradient(0, -R, R, 0);
+  sg.addColorStop(0,   'rgba(255,170,0,0)');
+  sg.addColorStop(0.7, 'rgba(255,170,0,0.12)');
+  sg.addColorStop(1,   'rgba(255,170,0,0.0)');
+  xRad.beginPath();
+  xRad.moveTo(0, 0);
+  xRad.arc(0, 0, R, -0.4, 0.4);
+  xRad.fillStyle = sg;
+  xRad.fill();
+  xRad.restore();
+
+  // Distâncias detectadas como anéis luminosos + blips
+  const dists = frame?.audio?.radar?.distancias || [];
+  dists.forEach((d, i) => {
+    const r = (d / DIST_MAX) * R;
+    if (r > R) return;
+
+    // Anel pulsante
+    const pulso = 0.5 + 0.5 * Math.sin(tRadar * 4 + i * 1.3);
+    xRad.beginPath();
+    xRad.arc(cx, cy, r, 0, Math.PI*2);
+    xRad.strokeStyle = `rgba(255,170,0,${0.5 + pulso * 0.4})`;
+    xRad.lineWidth   = 1.5 + pulso;
+    xRad.shadowColor = '#ffaa00';
+    xRad.shadowBlur  = 8;
+    xRad.stroke();
+    xRad.shadowBlur  = 0;
+
+    // Blip na posição angular do varredor
+    const anguloBlip = tRadar - 0.2;
+    const bx = cx + Math.cos(anguloBlip) * r;
+    const by = cy + Math.sin(anguloBlip) * r;
+    xRad.beginPath();
+    xRad.arc(bx, by, 4, 0, Math.PI*2);
+    xRad.fillStyle = '#ffaa00';
+    xRad.shadowColor = '#ffaa00';
+    xRad.shadowBlur  = 12;
+    xRad.fill();
+    xRad.shadowBlur  = 0;
+  });
+
+  // Ponto central (origem do chirp)
+  xRad.beginPath();
+  xRad.arc(cx, cy, 5, 0, Math.PI*2);
+  xRad.fillStyle = '#ffaa00';
+  xRad.shadowColor = '#ffaa00';
+  xRad.shadowBlur = 10;
+  xRad.fill();
+  xRad.shadowBlur = 0;
+}
+
+// ── Utilitário: linha plana ────────────────────────────────────────────
+function desenharPlano(ctx, w, h, cor) {
+  ctx.strokeStyle = `${cor}33`;
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, h/2);
+  ctx.lineTo(w, h/2);
+  ctx.stroke();
+}
+
+// ── Loop de animação ───────────────────────────────────────────────────
+function animar() {
+  requestAnimationFrame(animar);
+  desenharOnda(frame?.audio?.onda);
+  animarResp();
+  animarCard();
+  desenharRadar();
+}
+animar();
+</script>
+</body>
+</html>

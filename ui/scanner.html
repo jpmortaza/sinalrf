@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINALRF // SPECTRUM INTELLIGENCE</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    :root {
+      --verde:   #47DF7F; --amarelo: #F5D800; --verm:   #FF4444;
+      --azul:    #4FAFFF; --roxo:    #CC44FF; --ciano:  #00FFCC;
+      --cinza:   #333;    --fundo:   #000;    --painel: #060608;
+      --borda:   #141416; --txt:     #999;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--fundo);
+      color: var(--txt);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    /* ── HEADER ───────────────────────────────── */
+    .hdr {
+      border-bottom: 1px solid var(--borda);
+      padding: 8px 18px;
+      display: flex; align-items: center; gap: 14px;
+      background: #020204;
+      position: sticky; top: 0; z-index: 200;
+    }
+    .logo { color: var(--verde); font-size: 13px; font-weight: 700; letter-spacing: 3px; }
+    .sep  { color: #2a2a2a; }
+    .sub  { color: #3a3a3a; font-size: 10px; letter-spacing: 2px; }
+    a.back { color: #333; text-decoration: none; font-size: 10px; }
+    a.back:hover { color: var(--verde); }
+    .pill {
+      font-size: 9px; padding: 2px 7px; border-radius: 10px; letter-spacing: 1px;
+    }
+    .pill.ok      { background: rgba(71,223,127,.15); color: var(--verde); }
+    .pill.busy    { background: rgba(245,216,0,.15);  color: var(--amarelo); animation: fp .6s infinite; }
+    .pill.off     { background: rgba(255,68,68,.12);  color: var(--verm); }
+    .pill.scan    { background: rgba(79,175,255,.15); color: var(--azul); }
+    @keyframes fp { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .hdr-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+    .sweep-cnt { font-size:10px; color:#333; }
+
+    /* ── LAYOUT ───────────────────────────────── */
+    .wrap { padding: 12px 18px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-top: 12px; }
+
+    /* ── PAINEL ───────────────────────────────── */
+    .box {
+      background: var(--painel);
+      border: 1px solid var(--borda);
+      border-radius: 4px;
+    }
+    .bx-head {
+      background: #0a0a0d; border-bottom: 1px solid var(--borda);
+      padding: 6px 12px; display: flex; align-items: center; gap: 8px;
+      font-size: 9px; letter-spacing: 2.5px; color: var(--verde);
+    }
+    .bx-head .cnt {
+      margin-left: auto; font-size: 10px; color: #444;
+    }
+    .bx-body { padding: 10px 12px; }
+
+    /* ── PANORAMA ─────────────────────────────── */
+    .pan-wrap { position: relative; }
+    canvas.panorama {
+      width: 100%; height: 100px;
+      display: block;
+      background: #020205;
+      cursor: crosshair;
+    }
+    canvas.waterfall {
+      width: 100%; height: 60px;
+      display: block;
+      background: #010103;
+      border-top: 1px solid #0f0f12;
+    }
+    .freq-axis {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+      font-size: 9px;
+      color: #333;
+    }
+    .pan-tooltip {
+      position: absolute; top: 4px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,.9); border: 1px solid #222;
+      padding: 3px 10px; border-radius: 3px;
+      font-size: 10px; color: var(--verde);
+      pointer-events: none; display: none;
+    }
+    .band-legend {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      padding: 6px 0 2px;
+    }
+    .bl-item {
+      display: flex; align-items: center; gap: 3px;
+      font-size: 9px; color: #444;
+    }
+    .bl-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+    }
+
+    /* ── GALÁXIA ──────────────────────────────── */
+    .galaxy-wrap { position: relative; }
+    canvas.galaxy {
+      width: 100%; height: 280px;
+      display: block;
+      background: #010204;
+      cursor: crosshair;
+      border-radius: 3px;
+    }
+    .galaxy-tip {
+      position: absolute;
+      background: rgba(0,0,0,.92); border: 1px solid #1a1a2a;
+      padding: 4px 10px; border-radius: 3px;
+      font-size: 10px; color: var(--verde);
+      pointer-events: none; display: none; white-space: nowrap;
+    }
+
+    /* ── SINAIS TABLE ─────────────────────────── */
+    .sig-controls {
+      display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;
+    }
+    input.sig-filter {
+      background: #0c0c10; border: 1px solid #222;
+      color: var(--verde); font-family: inherit; font-size: 11px;
+      padding: 4px 8px; border-radius: 3px; outline: none; width: 120px;
+    }
+    input.sig-filter:focus { border-color: var(--verde); }
+    .sort-btn {
+      background: none; border: 1px solid #222; color: #444;
+      font-family: inherit; font-size: 9px; padding: 3px 8px;
+      border-radius: 3px; cursor: pointer; letter-spacing: 1px;
+    }
+    .sort-btn.ativo, .sort-btn:hover { border-color: var(--verde); color: var(--verde); }
+
+    .sig-table-wrap {
+      max-height: 300px; overflow-y: auto;
+    }
+    table.sig-tbl {
+      width: 100%; border-collapse: collapse;
+    }
+    table.sig-tbl th {
+      font-size: 9px; color: #333; letter-spacing: 1px;
+      padding: 4px 6px; border-bottom: 1px solid #111;
+      text-align: left; font-weight: 400; white-space: nowrap;
+      cursor: pointer;
+    }
+    table.sig-tbl th:hover { color: var(--verde); }
+    table.sig-tbl td {
+      font-size: 11px; padding: 4px 6px;
+      border-bottom: 1px solid #0a0a0a;
+      white-space: nowrap;
+    }
+    table.sig-tbl tr:hover td { background: #0c0c10; }
+    .td-freq { color: var(--verde); font-weight: 600; }
+    .td-dbm  { color: var(--txt); }
+    .td-cat  { font-size: 9px; padding: 1px 5px; border-radius: 3px; letter-spacing: 1px; }
+    .td-bar-wrap { width: 80px; height: 4px; background: #111; border-radius: 2px; overflow: hidden; display: inline-block; }
+    .td-bar  { height: 100%; border-radius: 2px; }
+    .td-novo { color: var(--amarelo); font-size: 9px; }
+
+    /* ── CATEGORIAS ───────────────────────────── */
+    .cat-grid {
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .cat-row {
+      display: flex; align-items: center; gap: 7px;
+    }
+    .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cat-nome { min-width: 90px; font-size: 10px; color: #555; }
+    .cat-bar-wrap { flex: 1; height: 4px; background: #0f0f0f; border-radius: 2px; overflow: hidden; }
+    .cat-bar { height: 100%; border-radius: 2px; transition: width .5s; }
+    .cat-n { min-width: 30px; text-align: right; font-size: 10px; color: #444; }
+
+    /* ── FEED ─────────────────────────────────── */
+    .feed-list {
+      display: flex; flex-direction: column;
+      max-height: 320px; overflow-y: auto; gap: 3px;
+    }
+    .feed-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 7px; background: #060608;
+      border: 1px solid #0e0e12; border-radius: 3px;
+      animation: fadeSlide .4s ease;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateX(-8px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .fi-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .fi-freq { color: var(--verde); font-size: 11px; min-width: 80px; }
+    .fi-dbm  { color: #555; font-size: 10px; min-width: 45px; }
+    .fi-cat  { font-size: 9px; min-width: 70px; }
+    .fi-desc { color: #333; font-size: 9px; overflow: hidden; white-space: nowrap; }
+    .fi-ts   { margin-left: auto; color: #222; font-size: 9px; }
+
+    /* ── CATEGORY CHIPS ──────────────────────── */
+    .cat-chips {
+      display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;
+    }
+    .chip {
+      background: none; border: 1px solid #1e1e22; color: #3a3a44;
+      font-family: inherit; font-size: 9px; padding: 3px 9px; border-radius: 12px;
+      cursor: pointer; letter-spacing: 1px; transition: all .15s; white-space: nowrap;
+    }
+    .chip:hover { border-color: #555; color: #888; }
+    .chip.ativo { border-color: var(--verde); color: var(--verde); background: rgba(71,223,127,.08); }
+
+    /* ── MINI PLAYER ─────────────────────────── */
+    #miniPlayer {
+      position: fixed; bottom: 20px; right: 20px; z-index: 500;
+      background: #08080e; border: 1px solid rgba(71,223,127,.4);
+      border-radius: 6px; padding: 10px 14px; min-width: 280px;
+      box-shadow: 0 0 24px rgba(71,223,127,.12);
+      display: none;
+    }
+    #miniPlayer.vis { display: block; }
+    .mp-head {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    }
+    .mp-freq { color: var(--verde); font-size: 14px; font-weight: 700; }
+    .mp-nome { color: #555; font-size: 10px; flex: 1; }
+    .mp-close { background: none; border: none; color: #333; cursor: pointer; font-size: 14px; }
+    .mp-close:hover { color: var(--verm); }
+    .mp-controls { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .mp-btn {
+      background: transparent; border: 1px solid #222; color: #555;
+      font-family: inherit; font-size: 9px; padding: 4px 10px; border-radius: 3px;
+      cursor: pointer; letter-spacing: 1px; white-space: nowrap;
+    }
+    .mp-btn:hover { border-color: var(--verde); color: var(--verde); }
+    .mp-btn.ativo { border-color: var(--verde); color: var(--verde); background: rgba(71,223,127,.08); }
+    .mp-btn.stop  { border-color: var(--verm); color: var(--verm); }
+    .mp-db { font-size: 10px; color: #444; margin-left: auto; }
+    canvas.mp-onda {
+      width: 100%; height: 36px; display: block;
+      background: #030303; border: 1px solid #101010; border-radius: 3px;
+    }
+    .td-play {
+      background: none; border: none; color: #2a2a2a; cursor: pointer;
+      font-size: 11px; padding: 2px 5px; border-radius: 3px;
+    }
+    .td-play:hover { color: var(--verde); background: rgba(71,223,127,.08); }
+
+    /* ── STATS BAR ────────────────────────────── */
+    .stats-bar {
+      display: flex; gap: 16px; padding: 6px 0;
+      font-size: 10px; color: #333;
+    }
+    .stat-v { color: var(--verde); font-size: 14px; font-weight: 700; }
+    .stat-l { color: #333; font-size: 9px; letter-spacing: 1px; }
+
+    /* ── SCROLLBAR ────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #000; }
+    ::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 2px; }
+
+    /* ── WATERFALL HIST ───────────────────────── */
+    canvas.wf-hist {
+      width: 100%; height: 50px; display: block;
+      background: #010103;
+    }
+  </style>
+</head>
+<body>
+
+<script src="nav.js"></script>
+
+<!-- HEADER -->
+<header class="hdr">
+  <span class="logo">SINALRF</span>
+  <span class="sep">//</span>
+  <span class="sub">SPECTRUM INTELLIGENCE</span>
+  <a href="/" class="back">◀ DASHBOARD</a>
+  <a href="/radio.html" class="back" style="margin-left:4px">📻 RÁDIO</a>
+  <a href="/imsi-catcher.html" class="back" style="margin-left:4px">📱 IMSI</a>
+  <div class="hdr-right">
+    <span class="pill off" id="hdPill">OFFLINE</span>
+    <span class="sweep-cnt" id="hdSweep">sweeps: 0</span>
+    <span class="sweep-cnt" id="hdBins">bins: 0</span>
+    <span class="sweep-cnt" id="hdRange">—</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div>
+      <div class="stat-v" id="svSinais">0</div>
+      <div class="stat-l">SINAIS</div>
+    </div>
+    <div>
+      <div class="stat-v" id="svBins">0</div>
+      <div class="stat-l">BINS</div>
+    </div>
+    <div>
+      <div class="stat-v" id="svCats">0</div>
+      <div class="stat-l">CATEGORIAS</div>
+    </div>
+    <div>
+      <div class="stat-v" id="svSweeps">0</div>
+      <div class="stat-l">PASSAGENS</div>
+    </div>
+    <div>
+      <div class="stat-v" id="svDur">—s</div>
+      <div class="stat-l">TEMPO/SWEEP</div>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+      <span style="font-size:10px;color:#333">88 MHz – 6 GHz · 1 MHz/bin</span>
+    </div>
+  </div>
+
+  <!-- PANORAMA -->
+  <div class="box">
+    <div class="bx-head">
+      PANORAMA ESPECTRAL
+      <span style="color:#333;font-size:9px;margin-left:8px">escala logarítmica · hover para frequência</span>
+      <span class="cnt" id="panSt">aguardando…</span>
+    </div>
+    <div class="bx-body" style="padding:8px 10px">
+      <div class="pan-wrap">
+        <canvas class="panorama" id="panCanvas" width="1200" height="100"></canvas>
+        <canvas class="waterfall" id="wfCanvas" width="1200" height="60"></canvas>
+        <div class="pan-tooltip" id="panTip"></div>
+      </div>
+      <div class="freq-axis" id="freqAxis"></div>
+      <div class="band-legend" id="bandLegend"></div>
+    </div>
+  </div>
+
+  <!-- GALÁXIA + CATEGORIAS -->
+  <div class="row2">
+    <div class="box">
+      <div class="bx-head">
+        CONSTELAÇÃO DE SINAIS
+        <span style="color:#333;font-size:9px;margin-left:8px">X=frequência · Y=força · tamanho=persistência</span>
+        <span class="cnt" id="galCnt">0 sinais</span>
+      </div>
+      <div class="bx-body" style="padding:8px 10px">
+        <div class="galaxy-wrap">
+          <canvas class="galaxy" id="galCanvas" width="1200" height="280"></canvas>
+          <div class="galaxy-tip" id="galTip"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="bx-head">CATEGORIAS <span class="cnt" id="catCnt">0</span></div>
+      <div class="bx-body">
+        <div class="cat-grid" id="catGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SINAIS TABLE + FEED -->
+  <div class="row2" style="margin-top:12px">
+    <div class="box">
+      <div class="bx-head">
+        SINAIS DESCOBERTOS
+        <span class="cnt" id="tblCnt">0</span>
+      </div>
+      <div class="bx-body">
+        <div class="cat-chips" id="catChips">
+          <button class="chip ativo" onclick="setCatFiltro(null,this)">TODOS</button>
+        </div>
+        <div class="sig-controls">
+          <input class="sig-filter" id="sigFilter" placeholder="filtrar freq / banda…" oninput="filtrarTabela()">
+          <button class="sort-btn ativo" data-sort="dbm"       onclick="sortTabela(this)">FORÇA</button>
+          <button class="sort-btn"       data-sort="freq_mhz"  onclick="sortTabela(this)">FREQ</button>
+          <button class="sort-btn"       data-sort="persist"   onclick="sortTabela(this)">PERSIST</button>
+          <button class="sort-btn"       data-sort="cat"       onclick="sortTabela(this)">BANDA</button>
+        </div>
+        <div class="sig-table-wrap">
+          <table class="sig-tbl" id="sigTbl">
+            <thead>
+              <tr>
+                <th>FREQ (MHz)</th>
+                <th>dBm</th>
+                <th>MÁXIMO</th>
+                <th>PERSIST</th>
+                <th>BANDA</th>
+                <th>DESCRIÇÃO</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="sigBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="bx-head">FEED DE DESCOBERTAS <span class="cnt" id="feedCnt">0</span></div>
+      <div class="bx-body" style="padding:8px 10px">
+        <div class="feed-list" id="feedList"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<!-- ── Mini Player ───────────────────────────────────────────────────────── -->
+<div id="miniPlayer">
+  <div class="mp-head">
+    <span class="mp-freq" id="mpFreq">— MHz</span>
+    <span class="mp-nome" id="mpNome"></span>
+    <button class="mp-close" onclick="mpFechar()" title="Fechar">✕</button>
+  </div>
+  <div class="mp-controls">
+    <button class="mp-btn ativo" id="mpPlayBtn" onclick="mpToggle()">▶ ESCUTAR</button>
+    <button class="mp-btn" id="mpCapBtn" onclick="mpCapturar()">⬇ CAPTURAR</button>
+    <span class="mp-db" id="mpDb">— dB</span>
+  </div>
+  <canvas class="mp-onda" id="mpOnda" width="400" height="36"></canvas>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   SinalRF — Spectrum Intelligence
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const WS_URL = `ws://${location.host}/ws/intel`;
+
+let _data    = null;      // último payload recebido
+let _wf_hist = [];        // histórico para waterfall [row: Float32Array]
+const WF_ROWS = 40;
+const PAN_W   = 1200, PAN_H = 100;
+const GAL_W   = 1200, GAL_H = 280;
+
+// ── Bandas para legend e cor de fundo ──────────────────────────────────────
+const BAND_LEGEND = [
+  { mn: 88,    mx: 108,  cat: "FM",       cor: "#47DF7F" },
+  { mn: 108,   mx: 137,  cat: "AVIAÇÃO",  cor: "#4FAFFF" },
+  { mn: 174,   mx: 230,  cat: "DAB",      cor: "#FF44CC" },
+  { mn: 433,   mx: 435,  cat: "ISM-433",  cor: "#FFD700" },
+  { mn: 698,   mx: 960,  cat: "CELULAR",  cor: "#FF4444" },
+  { mn: 1164,  mx: 1610, cat: "GNSS",     cor: "#00FF88" },
+  { mn: 1700,  mx: 2170, cat: "CELULAR",  cor: "#FF4444" },
+  { mn: 2400,  mx: 2483, cat: "WiFi-2G",  cor: "#4FAFFF" },
+  { mn: 3300,  mx: 3800, cat: "5G",       cor: "#FF44FF" },
+  { mn: 5150,  mx: 5850, cat: "WiFi-5G",  cor: "#4FAFFF" },
+];
+
+// ── Log-scale helpers ───────────────────────────────────────────────────────
+const LOG_MIN = Math.log10(88);
+const LOG_MAX = Math.log10(6000);
+function freqToX(mhz, W) {
+  return ((Math.log10(mhz) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * W;
+}
+function xToFreq(x, W) {
+  return Math.pow(10, x / W * (LOG_MAX - LOG_MIN) + LOG_MIN);
+}
+
+// ── dBm → RGBA color ───────────────────────────────────────────────────────
+function dbToRgb(db) {
+  const t = Math.max(0, Math.min(1, (db + 100) / 65));
+  if (t < 0.33) {
+    const s = t / 0.33;
+    return `rgb(${Math.round(s*10)},${Math.round(s*30)},${Math.round(s*20)})`;
+  } else if (t < 0.65) {
+    const s = (t - 0.33) / 0.32;
+    return `rgb(${Math.round(10+s*61)},${Math.round(30+s*193)},${Math.round(20+s*107)})`;
+  } else if (t < 0.85) {
+    const s = (t - 0.65) / 0.20;
+    return `rgb(${Math.round(71+s*184)},${Math.round(223+s*32)},${Math.round(127-s*127)})`;
+  } else {
+    const s = (t - 0.85) / 0.15;
+    return `rgb(255,${Math.round(255)},${Math.round(s*255)})`;
+  }
+}
+
+// ── WebSocket ───────────────────────────────────────────────────────────────
+let _ws;
+function conectar() {
+  _ws = new WebSocket(WS_URL);
+  _ws.onopen  = () => setPill('scan', 'CONECTADO');
+  _ws.onclose = () => { setPill('off', 'OFFLINE'); setTimeout(conectar, 5000); };
+  _ws.onerror = () => setPill('off', 'ERRO');
+  _ws.onmessage = (ev) => {
+    _data = JSON.parse(ev.data);
+    atualizar(_data);
+  };
+}
+
+function setPill(cls, txt) {
+  const p = document.getElementById('hdPill');
+  p.className = 'pill ' + cls;
+  p.textContent = txt;
+}
+
+// ── Atualiza tudo ───────────────────────────────────────────────────────────
+function atualizar(d) {
+  if (!d) return;
+
+  // Header
+  if (d.conectado) {
+    setPill(d.sweep_em_curso ? 'busy' : 'ok',
+            d.sweep_em_curso ? 'VARRENDO…' : 'ATIVO');
+  }
+  document.getElementById('hdSweep').textContent  = `sweeps: ${d.sweeps}`;
+  document.getElementById('hdBins').textContent   = `bins: ${d.n_bins.toLocaleString()}`;
+  document.getElementById('hdRange').textContent  =
+    d.freq_min_mhz ? `${d.freq_min_mhz}–${d.freq_max_mhz} MHz` : '—';
+
+  // Stats bar
+  document.getElementById('svSinais').textContent  = (d.n_ativos || 0).toLocaleString();
+  document.getElementById('svBins').textContent    = (d.n_bins || 0).toLocaleString();
+  document.getElementById('svCats').textContent    = Object.keys(d.categorias || {}).length;
+  document.getElementById('svSweeps').textContent  = d.sweeps || 0;
+  document.getElementById('svDur').textContent     = d.duracao_sweep ? d.duracao_sweep + 's' : '—s';
+
+  const pan = d.panorama;
+  if (pan && pan.freqs.length > 0) {
+    document.getElementById('panSt').textContent =
+      `${pan.freqs.length} pontos · último: ${new Date().toLocaleTimeString()}`;
+    desenharPanorama(pan);
+    atualizarWaterfall(pan);
+    construirEixo(pan);
+  }
+
+  if (d.sinais && d.sinais.length > 0) {
+    desenharGalaxia(d.sinais);
+    atualizarTabela(d.sinais);
+    document.getElementById('galCnt').textContent = d.sinais.length + ' sinais';
+    document.getElementById('tblCnt').textContent = d.sinais.length;
+  }
+
+  if (d.categorias) atualizarCategorias(d.categorias);
+  if (d.descobertos) atualizarFeed(d.descobertos);
+}
+
+// ── Panorama ────────────────────────────────────────────────────────────────
+function desenharPanorama(pan) {
+  const cv  = document.getElementById('panCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Fundo: bandas coloridas muito sutis
+  for (const b of BAND_LEGEND) {
+    const x0 = freqToX(b.mn, W);
+    const x1 = freqToX(b.mx, W);
+    const grd = ctx.createLinearGradient(x0, 0, x1, 0);
+    grd.addColorStop(0, 'rgba(0,0,0,0)');
+    const c = hexToRgba(b.cor, 0.04);
+    grd.addColorStop(0.5, c);
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(x0, 0, x1 - x0, H);
+  }
+
+  // Linha de baseline
+  if (pan.baseline && pan.baseline.length === pan.freqs.length) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 4]);
+    ctx.beginPath();
+    for (let i = 0; i < pan.freqs.length; i++) {
+      const x = freqToX(pan.freqs[i], W);
+      const y = H - (pan.baseline[i] + 110) / 70 * H;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Espectro atual
+  ctx.strokeStyle = 'rgba(71,223,127,0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < pan.freqs.length; i++) {
+    const x = freqToX(pan.freqs[i], W);
+    const y = H - (pan.dbm[i] + 110) / 70 * H;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Preenchimento gradiente
+  const fill = ctx.createLinearGradient(0, 0, 0, H);
+  fill.addColorStop(0, 'rgba(71,223,127,0.25)');
+  fill.addColorStop(1, 'rgba(71,223,127,0.0)');
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.moveTo(freqToX(pan.freqs[0], W), H);
+  for (let i = 0; i < pan.freqs.length; i++) {
+    const x = freqToX(pan.freqs[i], W);
+    const y = H - (pan.dbm[i] + 110) / 70 * H;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(freqToX(pan.freqs[pan.freqs.length - 1], W), H);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ── Waterfall ────────────────────────────────────────────────────────────────
+function atualizarWaterfall(pan) {
+  if (!pan.dbm.length) return;
+  _wf_hist.push([...pan.dbm]);
+  if (_wf_hist.length > WF_ROWS) _wf_hist.shift();
+
+  const cv  = document.getElementById('wfCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const rowH = H / WF_ROWS;
+
+  ctx.clearRect(0, 0, W, H);
+
+  for (let r = 0; r < _wf_hist.length; r++) {
+    const row = _wf_hist[r];
+    const y   = (WF_ROWS - _wf_hist.length + r) * rowH;
+    for (let i = 0; i < row.length - 1; i++) {
+      const x0 = freqToX(pan.freqs[i],   W);
+      const x1 = freqToX(pan.freqs[i+1], W);
+      ctx.fillStyle = dbToRgb(row[i]);
+      ctx.fillRect(x0, y, Math.max(1, x1 - x0), rowH + 0.5);
+    }
+  }
+}
+
+// ── Eixo de frequência ───────────────────────────────────────────────────────
+function construirEixo(pan) {
+  const ticks = [88, 100, 150, 200, 300, 433, 500, 700, 900, 1000, 1575, 2000, 2450, 3500, 5500];
+  const ax = document.getElementById('freqAxis');
+  const W  = ax.offsetWidth || 1200;
+  ax.innerHTML = '';
+  ax.style.position = 'relative';
+  for (const f of ticks) {
+    const pct = (freqToX(f, 1) * 100).toFixed(2);
+    const el  = document.createElement('span');
+    el.style.cssText = `position:absolute;left:${pct}%;transform:translateX(-50%)`;
+    el.textContent = f >= 1000 ? (f/1000).toFixed(1)+'G' : f+'M';
+    ax.appendChild(el);
+  }
+
+  // Legend de bandas
+  const lg = document.getElementById('bandLegend');
+  if (lg.children.length === 0) {
+    const seen = new Set();
+    for (const b of BAND_LEGEND) {
+      if (seen.has(b.cat)) continue;
+      seen.add(b.cat);
+      const d = document.createElement('div');
+      d.className = 'bl-item';
+      d.innerHTML = `<div class="bl-dot" style="background:${b.cor}"></div><span>${b.cat}</span>`;
+      lg.appendChild(d);
+    }
+  }
+}
+
+// ── Galáxia ──────────────────────────────────────────────────────────────────
+let _galFrame = 0;
+let _galSinais = [];
+
+function desenharGalaxia(sinais) {
+  _galSinais = sinais;
+  const cv  = document.getElementById('galCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const PAD_TOP = 15, PAD_BOT = 20;
+  const DB_MIN = -110, DB_MAX = -25;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Fundo: nebulosas de bandas
+  for (const b of BAND_LEGEND) {
+    const x0 = freqToX(b.mn, W);
+    const x1 = freqToX(b.mx, W);
+    if (x1 - x0 < 1) continue;
+    const grd = ctx.createLinearGradient(x0, 0, x1, 0);
+    const c = hexToRgba(b.cor, 0.05);
+    grd.addColorStop(0, 'rgba(0,0,0,0)');
+    grd.addColorStop(0.5, c);
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(x0, 0, x1 - x0, H);
+  }
+
+  // Eixos sutis
+  ctx.strokeStyle = '#0f0f14';
+  ctx.lineWidth = 1;
+  for (let db = DB_MIN; db <= DB_MAX; db += 15) {
+    const y = H - PAD_BOT - (db - DB_MIN) / (DB_MAX - DB_MIN) * (H - PAD_TOP - PAD_BOT);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillStyle = '#222'; ctx.font = '9px JetBrains Mono';
+    ctx.fillText(db + 'dB', 3, y - 2);
+  }
+
+  _galFrame++;
+  const now = _galFrame;
+
+  // Sinais como estrelas
+  for (const s of sinais) {
+    const x = freqToX(s.freq_mhz, W);
+    const y = H - PAD_BOT - (s.dbm - DB_MIN) / (DB_MAX - DB_MIN) * (H - PAD_TOP - PAD_BOT);
+
+    if (y < 0 || y > H) continue;
+
+    const persist = s.persistencia;
+    const radius  = 2.5 + persist * 8;
+    const alpha   = 0.3 + Math.min(0.7, (s.dbm + 100) / 70);
+
+    // Glow para sinais fortes/persistentes
+    if (persist > 0.3 || s.dbm > -55) {
+      ctx.shadowBlur  = 6 + persist * 14 + Math.max(0, (s.dbm + 60) / 5);
+      ctx.shadowColor = s.cor;
+    }
+
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle   = s.cor;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 1;
+
+    // Anel pulsante para sinais novos
+    if (s.novo) {
+      const pulse = 0.4 + 0.4 * Math.sin(now * 0.08);
+      ctx.strokeStyle = s.cor;
+      ctx.lineWidth   = 1;
+      ctx.globalAlpha = pulse;
+      ctx.beginPath();
+      ctx.arc(x, y, radius + 4 + pulse * 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Labels das bandas no topo
+  ctx.font = '8px JetBrains Mono';
+  const seenLbl = new Set();
+  for (const b of BAND_LEGEND) {
+    const x0 = freqToX(b.mn, W);
+    const x1 = freqToX(b.mx, W);
+    const cx  = (x0 + x1) / 2;
+    if (seenLbl.has(b.cat)) continue;
+    seenLbl.add(b.cat);
+    ctx.fillStyle   = b.cor + '88';
+    ctx.globalAlpha = 0.7;
+    ctx.fillText(b.cat, cx - ctx.measureText(b.cat).width / 2, 10);
+  }
+  ctx.globalAlpha = 1;
+
+  document.getElementById('galCnt').textContent = sinais.length + ' sinais';
+}
+
+// Tooltip na galáxia
+document.getElementById('galCanvas').addEventListener('mousemove', (ev) => {
+  if (!_galSinais.length) return;
+  const cv   = ev.target;
+  const rect = cv.getBoundingClientRect();
+  const mx   = (ev.clientX - rect.left) * (cv.width / rect.width);
+  const my   = (ev.clientY - rect.top)  * (cv.height / rect.height);
+  const tip  = document.getElementById('galTip');
+
+  let best = null, bestDist = 999;
+  for (const s of _galSinais) {
+    const x = freqToX(s.freq_mhz, cv.width);
+    const y = cv.height - 20 - (s.dbm + 110) / 85 * (cv.height - 35);
+    const d = Math.hypot(mx - x, my - y);
+    if (d < bestDist) { bestDist = d; best = s; }
+  }
+
+  if (best && bestDist < 20) {
+    tip.style.display  = 'block';
+    tip.style.left     = (ev.clientX - rect.left + 12) + 'px';
+    tip.style.top      = (ev.clientY - rect.top  - 30) + 'px';
+    tip.innerHTML = `<span style="color:${best.cor}">${best.freq_mhz} MHz</span>
+      &nbsp;${best.dbm} dBm&nbsp;·&nbsp;${best.cat}&nbsp;·&nbsp;persist=${(best.persistencia*100).toFixed(0)}%
+      <br><span style="color:#555;font-size:9px">${best.desc}</span>`;
+  } else {
+    tip.style.display = 'none';
+  }
+});
+document.getElementById('galCanvas').addEventListener('mouseleave', () => {
+  document.getElementById('galTip').style.display = 'none';
+});
+
+// Tooltip no panorama
+document.getElementById('panCanvas').addEventListener('mousemove', (ev) => {
+  const cv   = ev.target;
+  const rect = cv.getBoundingClientRect();
+  const mx   = (ev.clientX - rect.left) * (cv.width / rect.width);
+  const mhz  = xToFreq(mx, cv.width);
+  const tip  = document.getElementById('panTip');
+  tip.style.display = 'block';
+
+  // Encontra dBm no panorama
+  let dbmTxt = '';
+  if (_data && _data.panorama && _data.panorama.freqs.length > 0) {
+    const pf = _data.panorama.freqs;
+    const pd = _data.panorama.dbm;
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < pf.length; i++) {
+      const d = Math.abs(pf[i] - mhz);
+      if (d < bd) { bd = d; best = i; }
+    }
+    dbmTxt = ` · ${pd[best]} dBm`;
+  }
+
+  // Categoria
+  const cat = _data && _data.sinais ? (() => {
+    const s = _data.sinais.find(s => Math.abs(s.freq_mhz - mhz) < 5);
+    return s ? ` · ${s.cat}` : '';
+  })() : '';
+
+  tip.textContent = `${mhz.toFixed(1)} MHz${dbmTxt}${cat}`;
+});
+document.getElementById('panCanvas').addEventListener('mouseleave', () => {
+  document.getElementById('panTip').style.display = 'none';
+});
+
+// Clique no panorama → abre mini player naquela frequência
+document.getElementById('panCanvas').addEventListener('click', (ev) => {
+  const cv   = ev.target;
+  const rect = cv.getBoundingClientRect();
+  const mx   = (ev.clientX - rect.left) * (cv.width / rect.width);
+  const mhz  = Math.round(xToFreq(mx, cv.width) * 10) / 10;
+
+  // Tenta encontrar sinal conhecido próximo (±2 MHz)
+  const prox = _galSinais.find(s => Math.abs(s.freq_mhz - mhz) < 2);
+  mpAbrir(prox ? prox.freq_mhz : mhz, prox ? (prox.desc || prox.cat) : `${mhz} MHz`);
+});
+
+// ── Tabela de sinais ─────────────────────────────────────────────────────────
+let _sinaisAll = [];
+let _sortKey   = 'dbm';
+let _sortDesc  = true;
+let _catFiltro = null; // null = todos
+
+function atualizarTabela(sinais) {
+  _sinaisAll = sinais;
+  _construirChips(sinais);
+  renderTabela();
+}
+
+function filtrarTabela() {
+  renderTabela();
+}
+
+function sortTabela(btn) {
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('ativo'));
+  btn.classList.add('ativo');
+  const key = btn.dataset.sort;
+  if (_sortKey === key) _sortDesc = !_sortDesc;
+  else { _sortKey = key; _sortDesc = true; }
+  renderTabela();
+}
+
+function setCatFiltro(cat, btn) {
+  _catFiltro = cat;
+  document.querySelectorAll('.chip').forEach(b => b.classList.remove('ativo'));
+  btn.classList.add('ativo');
+  renderTabela();
+}
+
+let _chipsBuilt = new Set();
+function _construirChips(sinais) {
+  const chips = document.getElementById('catChips');
+  const cats  = [...new Set(sinais.map(s => s.cat))].sort();
+  for (const cat of cats) {
+    if (_chipsBuilt.has(cat)) continue;
+    _chipsBuilt.add(cat);
+    const b = document.createElement('button');
+    b.className = 'chip';
+    // Find color from BAND_LEGEND or from signal
+    const sig = sinais.find(s => s.cat === cat);
+    const cor = sig ? sig.cor : '#47DF7F';
+    b.style.setProperty('--chip-cor', cor);
+    b.textContent = cat;
+    b.onclick = () => setCatFiltro(cat, b);
+    b.addEventListener('mouseenter', () => { if (!b.classList.contains('ativo')) b.style.borderColor = cor; });
+    b.addEventListener('mouseleave', () => { if (!b.classList.contains('ativo')) b.style.borderColor = ''; });
+    chips.appendChild(b);
+  }
+}
+
+function renderTabela() {
+  const filtro = document.getElementById('sigFilter').value.toLowerCase();
+  let lista = _sinaisAll.filter(s => {
+    if (_catFiltro && s.cat !== _catFiltro) return false;
+    return !filtro ||
+      s.freq_mhz.toString().includes(filtro) ||
+      s.cat.toLowerCase().includes(filtro) ||
+      s.desc.toLowerCase().includes(filtro);
+  });
+
+  lista.sort((a, b) => {
+    let va = a[_sortKey] ?? 0, vb = b[_sortKey] ?? 0;
+    if (typeof va === 'string') { va = va.localeCompare(vb); vb = 0; }
+    return _sortDesc ? vb - va : va - vb;
+  });
+
+  const body = document.getElementById('sigBody');
+  body.innerHTML = lista.slice(0, 500).map(s => {
+    const pct   = Math.max(0, Math.min(100, (s.dbm + 100) / 65 * 100)).toFixed(1);
+    const ppct  = (s.persistencia * 100).toFixed(0);
+    return `<tr style="cursor:pointer" onclick="mpAbrir(${s.freq_mhz},'${s.desc||s.cat}')">
+      <td class="td-freq">${s.freq_mhz}</td>
+      <td class="td-dbm">${s.dbm} <div class="td-bar-wrap"><div class="td-bar" style="width:${pct}%;background:${s.cor}"></div></div></td>
+      <td style="color:#555">${s.dbm_max}</td>
+      <td>${ppct}%</td>
+      <td><span class="td-cat" style="background:${s.cor}20;color:${s.cor}">${s.cat}</span></td>
+      <td style="color:#444;font-size:10px">${s.desc}</td>
+      <td><button class="td-play" title="Escutar ${s.freq_mhz} MHz"
+                  onclick="event.stopPropagation();mpAbrir(${s.freq_mhz},'${s.desc||s.cat}')">▶</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tblCnt').textContent = lista.length;
+}
+
+// ── Categorias ───────────────────────────────────────────────────────────────
+function atualizarCategorias(cats) {
+  const grid = document.getElementById('catGrid');
+  const maxN  = Math.max(...Object.values(cats).map(c => c.n), 1);
+  grid.innerHTML = Object.entries(cats)
+    .sort((a, b) => b[1].n - a[1].n)
+    .map(([nome, c]) => {
+      const pct = (c.n / maxN * 100).toFixed(1);
+      return `<div class="cat-row">
+        <div class="cat-dot" style="background:${c.cor}"></div>
+        <span class="cat-nome">${nome}</span>
+        <div class="cat-bar-wrap"><div class="cat-bar" style="width:${pct}%;background:${c.cor}"></div></div>
+        <span class="cat-n">${c.n}</span>
+      </div>`;
+    }).join('');
+  document.getElementById('catCnt').textContent = Object.keys(cats).length;
+}
+
+// ── Feed de descobertas ───────────────────────────────────────────────────────
+let _feedCount = 0;
+function atualizarFeed(descobertos) {
+  const list = document.getElementById('feedList');
+  if (!descobertos.length) return;
+
+  if (descobertos.length !== _feedCount) {
+    _feedCount = descobertos.length;
+    list.innerHTML = descobertos.slice(0, 60).map(d => {
+      const ts = d.ts ? new Date(d.ts * 1000).toLocaleTimeString('pt-BR') : '';
+      return `<div class="feed-item">
+        <div class="fi-dot" style="background:${d.cor}"></div>
+        <span class="fi-freq">${d.freq_mhz} MHz</span>
+        <span class="fi-dbm">${d.dbm} dBm</span>
+        <span class="fi-cat" style="color:${d.cor}">${d.cat}</span>
+        <span class="fi-desc">${d.desc}</span>
+        <span class="fi-ts">${ts}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('feedCnt').textContent = descobertos.length;
+  }
+}
+
+// ── Loop de animação da galáxia ──────────────────────────────────────────────
+function animate() {
+  if (_galSinais.length > 0) desenharGalaxia(_galSinais);
+  requestAnimationFrame(animate);
+}
+
+// ── Utilitários ───────────────────────────────────────────────────────────────
+function hexToRgba(hex, a) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ═══ MINI PLAYER ══════════════════════════════════════════════════════════════
+let _mpFreq    = null;
+let _mpWs      = null;
+let _mpCtx     = null;
+let _mpNextAt  = 0;
+let _mpAtivo   = false;
+let _mpOndaHist = new Float32Array(400);
+
+function mpAbrir(freq, nome) {
+  _mpFreq = freq;
+  document.getElementById('mpFreq').textContent = freq + ' MHz';
+  document.getElementById('mpNome').textContent = nome || '';
+  document.getElementById('miniPlayer').classList.add('vis');
+  mpIniciar();
+}
+
+function mpFechar() {
+  mpParar();
+  document.getElementById('miniPlayer').classList.remove('vis');
+  _mpFreq = null;
+}
+
+function mpToggle() {
+  if (_mpAtivo) { mpParar(); } else { mpIniciar(); }
+}
+
+function mpIniciar() {
+  if (!_mpFreq) return;
+  mpParar();
+
+  _mpCtx   = new AudioContext({ sampleRate: 48000 });
+  _mpNextAt = _mpCtx.currentTime + 0.1;
+  _mpWs    = new WebSocket(`ws://${location.host}/ws/radio?freq=${_mpFreq}`);
+  _mpWs.binaryType = 'arraybuffer';
+
+  const btn = document.getElementById('mpPlayBtn');
+  btn.textContent = '⏳ conectando…';
+  btn.className = 'mp-btn';
+
+  _mpWs.onmessage = ev => {
+    if (typeof ev.data === 'string') {
+      const msg = JSON.parse(ev.data);
+      if (msg.erro) { mpParar(); return; }
+      btn.textContent = '■ PARAR';
+      btn.className = 'mp-btn stop';
+      _mpAtivo = true;
+      requestAnimationFrame(_mpDesenhar);
+      return;
+    }
+    const pcm16 = new Int16Array(ev.data);
+    const f32   = new Float32Array(pcm16.length);
+    let mx = 0;
+    for (let i = 0; i < pcm16.length; i++) {
+      f32[i] = pcm16[i] / 32768;
+      mx = Math.max(mx, Math.abs(f32[i]));
+    }
+    // Onda
+    const step = Math.max(1, Math.floor(f32.length / 20));
+    const novo  = f32.filter((_, i) => i % step === 0);
+    _mpOndaHist = new Float32Array([..._mpOndaHist, ...novo].slice(-400));
+    // dB
+    const db = mx > 0 ? Math.max(-60, 20 * Math.log10(mx)) : -60;
+    document.getElementById('mpDb').textContent = db.toFixed(1) + ' dB';
+    // Audio
+    const buf = _mpCtx.createBuffer(1, f32.length, 48000);
+    buf.getChannelData(0).set(f32);
+    const src = _mpCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(_mpCtx.destination);
+    const now = _mpCtx.currentTime;
+    if (_mpNextAt < now) _mpNextAt = now + 0.05;
+    src.start(_mpNextAt);
+    _mpNextAt += buf.duration;
+  };
+
+  _mpWs.onclose = () => { if (_mpAtivo) mpParar(); };
+  _mpWs.onerror = () => mpParar();
+}
+
+function mpParar() {
+  _mpAtivo = false;
+  if (_mpWs) {
+    try { _mpWs.send('STOP'); } catch {}
+    try { _mpWs.close(); }  catch {}
+    _mpWs = null;
+  }
+  if (_mpCtx) { _mpCtx.close().catch(() => {}); _mpCtx = null; }
+  const btn = document.getElementById('mpPlayBtn');
+  btn.textContent = '▶ ESCUTAR';
+  btn.className = 'mp-btn ativo';
+  document.getElementById('mpDb').textContent = '— dB';
+}
+
+function _mpDesenhar() {
+  if (!_mpAtivo) return;
+  const cv  = document.getElementById('mpOnda');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.fillStyle = '#030303';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#47DF7F';
+  ctx.lineWidth = 1.2;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  const d = _mpOndaHist;
+  for (let i = 0; i < W; i++) {
+    const v = d[Math.floor(i * d.length / W)] || 0;
+    const y = H / 2 - v * (H / 2 - 3);
+    i === 0 ? ctx.moveTo(i, y) : ctx.lineTo(i, y);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(_mpDesenhar);
+}
+
+async function mpCapturar() {
+  if (!_mpFreq) return;
+  const dur = 3;
+  const btn = document.getElementById('mpCapBtn');
+  btn.textContent = '⏳ capturando…';
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/hackrf/clonar?freq=${_mpFreq}&duracao=${dur}`, { method: 'POST' });
+    const d = await r.json();
+    btn.textContent = r.ok ? '✓ salvo' : '✗ erro';
+    setTimeout(() => { btn.textContent = '⬇ CAPTURAR'; btn.disabled = false; }, 2500);
+  } catch {
+    btn.textContent = '✗ erro';
+    setTimeout(() => { btn.textContent = '⬇ CAPTURAR'; btn.disabled = false; }, 2000);
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+conectar();
+requestAnimationFrame(animate);
+
+// Eixo inicial vazio
+document.getElementById('freqAxis').style.position = 'relative';
+setTimeout(() => {
+  if (!_data) {
+    construirEixo({ freqs: [88, 1000, 6000], dbm: [], baseline: [] });
+  }
+}, 1000);
+</script>
+</body>
+</html>

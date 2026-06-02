@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINALRF — Swiss Army HackRF</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+
+  /* ── LAYOUT ── */
+  .app { max-width:1440px; margin:0 auto; padding:0 16px 40px; }
+  section { margin-top:20px; }
+  .sec-bar { display:flex; align-items:center; gap:0; font-size:10px; font-weight:600;
+    letter-spacing:1.5px; color:var(--g2); margin-bottom:10px; text-transform:uppercase; }
+  .sec-bar::before { content:'// '; color:var(--y2); }
+  .sec-bar::after  { content:''; flex:1; height:1px; background:var(--border); margin-left:10px; }
+
+  /* ── HERO ── */
+  .hero { padding:24px 0 8px; display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; }
+  .hero-left { flex:1; min-width:280px; }
+  .hero-title { font-size:28px; font-weight:700; color:var(--g); text-shadow:var(--glow-g);
+    letter-spacing:-1px; line-height:1.1; }
+  .hero-title .accent { color:var(--y); text-shadow:var(--glow-y); }
+  .hero-sub { margin-top:8px; font-size:11px; color:var(--g3); line-height:1.8; max-width:520px; }
+  .hero-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+  .tag { font-size:9px; font-weight:700; letter-spacing:1.2px; padding:3px 10px;
+    border:1px solid var(--border); color:var(--g2); text-transform:uppercase; }
+  .tag.y { color:var(--y2); border-color:rgba(245,216,0,.25); }
+  .tag.b { color:var(--b); border-color:rgba(79,175,255,.25); }
+  .tag.o { color:var(--o); border-color:rgba(255,140,51,.25); }
+  .tag.p { color:var(--p); border-color:rgba(175,111,255,.25); }
+  .tag.r { color:var(--r); border-color:rgba(255,59,48,.25); }
+
+  /* ── STATUS LIVE ── */
+  .status-strip { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+  .stat-box { background:var(--bg2); border:1px solid var(--border); padding:10px 16px;
+    display:flex; flex-direction:column; gap:4px; min-width:110px; }
+  .stat-val { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums;
+    color:var(--g); text-shadow:var(--glow-g); letter-spacing:-1px; }
+  .stat-lbl { font-size:9px; color:var(--g3); letter-spacing:1px; text-transform:uppercase; }
+
+  /* ── TOOLS GRID ── */
+  .tools-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+  .tool-card { background:var(--bg2); border:1px solid var(--border); padding:16px;
+    display:flex; flex-direction:column; gap:10px; position:relative;
+    transition:border-color .2s, background .2s; cursor:default; }
+  .tool-card:hover { border-color:var(--border2); background:var(--bg3); }
+  .tool-card::before,.tool-card::after { content:''; position:absolute; width:8px; height:8px;
+    border-style:solid; opacity:.5; }
+  .tool-card::before { top:-1px; left:-1px; border-color:var(--g2); border-width:2px 0 0 2px; }
+  .tool-card::after  { bottom:-1px; right:-1px; border-color:var(--g2); border-width:0 2px 2px 0; }
+  .tool-head { display:flex; align-items:center; gap:10px; }
+  .tool-icon { font-size:22px; line-height:1; }
+  .tool-name { font-size:13px; font-weight:700; color:var(--g); letter-spacing:1px; }
+  .tool-badge { font-size:9px; font-weight:600; padding:2px 7px; border:1px solid var(--border2);
+    color:var(--g2); letter-spacing:.8px; margin-left:auto; }
+  .tool-badge.novo { color:var(--y); border-color:rgba(245,216,0,.4); }
+  .tool-desc { font-size:11px; color:var(--g3); line-height:1.7; }
+  .tool-uses { display:flex; flex-wrap:wrap; gap:5px; }
+  .tool-use { font-size:9px; padding:2px 7px; border:1px solid var(--border); color:var(--g3); }
+  .tool-btn { display:inline-block; padding:7px 14px; border:1px solid var(--g2); color:var(--g2);
+    text-decoration:none; font-size:10px; font-weight:600; letter-spacing:1.2px;
+    transition:all .2s; font-family:var(--font); background:transparent; }
+  .tool-btn:hover { border-color:var(--g); color:var(--g); background:rgba(71,223,127,.08);
+    text-shadow:var(--glow-g); }
+  .tool-btn.b { border-color:var(--b2); color:var(--b); }
+  .tool-btn.b:hover { border-color:var(--b); background:rgba(79,175,255,.08); text-shadow:var(--glow-b); }
+  .tool-btn.y { border-color:var(--y2); color:var(--y); }
+  .tool-btn.y:hover { border-color:var(--y); background:rgba(245,216,0,.08); text-shadow:var(--glow-y); }
+  .tool-btn.r { border-color:rgba(255,59,48,.4); color:var(--r); }
+  .tool-btn.r:hover { border-color:var(--r); background:rgba(255,59,48,.08); text-shadow:var(--glow-r); }
+  .tool-btn.p { border-color:rgba(175,111,255,.4); color:var(--p); }
+  .tool-btn.p:hover { border-color:var(--p); background:rgba(175,111,255,.08); }
+
+  /* ── LIVE MINI PANELS ── */
+  .live-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  @media(max-width:800px){.live-grid{grid-template-columns:1fr}}
+  .mini-panel { background:var(--bg2); border:1px solid var(--border); padding:12px; }
+  .mini-title { font-size:9px; font-weight:700; letter-spacing:2px; color:var(--g2);
+    text-transform:uppercase; margin-bottom:8px; }
+  .mini-title::before { content:'[ '; color:var(--y2); }
+  .mini-title::after  { content:' ]'; color:var(--y2); }
+  canvas.mini { display:block; width:100%; height:60px; background:rgba(0,0,0,.6);
+    border:1px solid var(--border); }
+
+  /* ── SPECTRUM ── */
+  .spectrum-wrap { background:var(--bg2); border:1px solid var(--border); padding:12px; }
+  .wf-outer { border:1px solid var(--border); background:#000; overflow:hidden; position:relative; }
+  #waterfallCanvas { display:block; width:100%; image-rendering:pixelated; }
+  .wf-labels { display:flex; justify-content:space-between; font-size:9px;
+    color:var(--g3); padding:4px 2px 0; letter-spacing:.5px; }
+  .cw { background:rgba(0,0,0,.6); border:1px solid var(--border); overflow:hidden; margin-top:6px; }
+  #spectrumCanvas { display:block; width:100%; }
+
+  /* ── GUIDE ── */
+  .guide-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:700px){.guide-grid{grid-template-columns:1fr}}
+  .guide-card { background:var(--bg2); border:1px solid var(--border); padding:14px; }
+  .guide-title { font-size:11px; font-weight:700; color:var(--y); letter-spacing:1px;
+    margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+  .guide-step { display:flex; gap:10px; margin-bottom:10px; }
+  .step-num { font-size:10px; font-weight:700; color:var(--y); min-width:22px; flex-shrink:0;
+    border:1px solid rgba(245,216,0,.3); width:22px; height:22px; display:flex;
+    align-items:center; justify-content:center; }
+  .step-body { font-size:11px; color:var(--g3); line-height:1.7; }
+  .step-body strong { color:var(--g2); }
+  code { background:var(--bg4); border:1px solid var(--border); padding:1px 6px;
+    font-size:10px; color:var(--y2); font-family:var(--font); }
+
+  /* ── FREQ REFERENCE ── */
+  .freq-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .freq-table th { text-align:left; padding:5px 10px; font-size:9px; color:var(--g3);
+    letter-spacing:1px; border-bottom:1px solid var(--border); }
+  .freq-table td { padding:5px 10px; border-bottom:1px solid rgba(71,223,127,.06); vertical-align:middle; }
+  .freq-table tr:hover td { background:rgba(71,223,127,.04); }
+  .freq-range { font-weight:700; color:var(--g); font-variant-numeric:tabular-nums; }
+  .freq-name { color:var(--g2); }
+  .freq-use  { color:var(--g3); font-size:10px; }
+  .dot-band { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+
+  /* ── VITAIS ── */
+  .vitals-strip { display:flex; gap:10px; flex-wrap:wrap; }
+  .vital-box { background:var(--bg2); border:1px solid var(--border); padding:10px 16px;
+    display:flex; flex-direction:column; gap:3px; flex:1; min-width:130px; }
+  .vital-val { font-size:32px; font-weight:700; font-variant-numeric:tabular-nums;
+    letter-spacing:-2px; color:var(--g); text-shadow:var(--glow-g); }
+  .vital-lbl { font-size:9px; color:var(--g3); letter-spacing:1px; text-transform:uppercase; }
+  .vital-sub { font-size:10px; color:var(--g3); }
+
+  /* ── FOOTER ── */
+  footer { display:flex; gap:10px; align-items:center; padding:12px 0 4px;
+    border-top:1px solid var(--border); font-size:10px; color:var(--g3);
+    flex-wrap:wrap; margin-top:20px; letter-spacing:.5px; }
+  footer::before { content:'$ '; color:var(--y2); }
+  footer a { color:var(--g2); text-decoration:none; }
+  footer a:hover { color:var(--g); }
+  </style>
+</head>
+<body>
+
+<script src="nav.js"></script>
+
+<div class="app">
+
+  <!-- ══ HERO ══════════════════════════════════════════════════════ -->
+  <section class="hero" style="margin-top:24px">
+    <div class="hero-left">
+      <div class="hero-title">
+        HackRF<br>
+        <span class="accent">Swiss Army Knife</span>
+      </div>
+      <div class="hero-sub">
+        Plataforma de análise e operação de rádio-frequência usando o HackRF One.
+        Escuta, captura, clona e transmite sinais entre 1 MHz e 6 GHz.
+        Detecta presença humana via WiFi RSSI passivo. Monitora sinais vitais.
+        Rastreia dispositivos celulares via IMSI/TMSI. Visualiza o espectro em tempo real.
+      </div>
+      <div class="hero-tags">
+        <span class="tag">1 MHz – 6 GHz</span>
+        <span class="tag y">TX + RX</span>
+        <span class="tag b">SDR</span>
+        <span class="tag o">20 Msps</span>
+        <span class="tag p">8-bit IQ</span>
+        <span class="tag r">Duplex</span>
+      </div>
+    </div>
+    <div class="status-strip">
+      <div class="stat-box">
+        <span class="stat-val" id="sRssi">—</span>
+        <span class="stat-lbl">RSSI dBm</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-val" id="sBpm" style="color:var(--y);text-shadow:var(--glow-y)">—</span>
+        <span class="stat-lbl">BPM</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-val" id="sResp" style="color:var(--b);text-shadow:var(--glow-b)">—</span>
+        <span class="stat-lbl">Resp/min</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-val" id="sPresenca" style="font-size:14px;margin-top:4px">—</span>
+        <span class="stat-lbl">Presença</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-val" id="sGhost" style="color:var(--r);text-shadow:var(--glow-r)">0</span>
+        <span class="stat-lbl">Fantasmas</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ FERRAMENTAS ════════════════════════════════════════════════ -->
+  <section>
+    <div class="sec-bar">FERRAMENTAS DISPONÍVEIS</div>
+    <div class="tools-grid">
+
+      <!-- Radio -->
+      <div class="tool-card">
+        <div class="tool-head">
+          <span class="tool-icon">📻</span>
+          <span class="tool-name">RÁDIO FM</span>
+          <span class="tool-badge">88–108 MHz</span>
+        </div>
+        <div class="tool-desc">
+          Escuta qualquer estação de rádio FM em tempo real. O HackRF captura o sinal IQ bruto e demodula FM wideband diretamente no servidor. Também clona sinais de controles remotos, portões e outros dispositivos RF.
+        </div>
+        <div class="tool-uses">
+          <span class="tool-use">Rádio FM</span>
+          <span class="tool-use">Clonar controles</span>
+          <span class="tool-use">Rastrear frequências</span>
+          <span class="tool-use">Replay attack</span>
+        </div>
+        <a href="/radio.html" class="tool-btn">→ ABRIR RÁDIO</a>
+      </div>
+
+      <!-- Scanner -->
+      <div class="tool-card">
+        <div class="tool-head">
+          <span class="tool-icon">🌌</span>
+          <span class="tool-name">SCANNER ESPECTRO</span>
+          <span class="tool-badge">88–900 MHz</span>
+        </div>
+        <div class="tool-desc">
+          Varre todo o espectro de 88 MHz a 900 MHz em tempo real. Detecta estações FM ativas, sinais anômalos e "fantasmas" — transmissões irregulares ou inesperadas. Mostra waterfall 2D com histórico temporal.
+        </div>
+        <div class="tool-uses">
+          <span class="tool-use">Waterfall</span>
+          <span class="tool-use">Detecção FM</span>
+          <span class="tool-use">Ghost signals</span>
+          <span class="tool-use">Análise espectral</span>
+        </div>
+        <a href="/scanner.html" class="tool-btn">→ ABRIR SCANNER</a>
+      </div>
+
+      <!-- 3D RF -->
+      <div class="tool-card">
+        <div class="tool-head">
+          <span class="tool-icon">🔮</span>
+          <span class="tool-name">AMBIENTE 3D RF</span>
+          <span class="tool-badge novo">NOVO</span>
+        </div>
+        <div class="tool-desc">
+          Visualização 3D do ambiente RF ao redor do HackRF. Raios de sinal em todas as direções com cor por banda de frequência. A variação do RSSI WiFi reconstrói o ambiente detectando paredes, objetos e movimento.
+        </div>
+        <div class="tool-uses">
+          <span class="tool-use">Raios RF 3D</span>
+          <span class="tool-use">Detecção de ambiente</span>
+          <span class="tool-use">Visualização espectral</span>
+          <span class="tool-use">Radar 3D</span>
+        </div>
+        <a href="/3d.html" class="tool-btn b">→ ABRIR 3D</a>
+      </div>
+
+      <!-- Health -->
+      <div class="tool-card">
+        <div class="tool-head">
+          <span class="tool-icon">❤️</span>
+          <span class="tool-name">MONITOR DE SAÚDE</span>
+          <span class="tool-badge novo">NOVO</span>
+        </div>
+        <div class="tool-desc">
+          Monitora batimentos cardíacos e frequência respiratória em tempo real usando fusão de sensores: microfone (AirPods Pro = máxima precisão) + variação do RSSI WiFi via micro-Doppler. Sem contato físico.
+        </div>
+        <div class="tool-uses">
+          <span class="tool-use">Batimentos BPM</span>
+          <span class="tool-use">Respiração RPM</span>
+          <span class="tool-use">Presença</span>
+          <span class="tool-use">Histórico</span>
+        </div>
+        <a href="/health.html" class="tool-btn y">→ ABRIR SAÚDE</a>
+      </div>
+
+      <!-- IMSI -->
+      <div class="tool-card">
+        <div class="tool-head">
+          <span class="tool-icon">📱</span>
+          <span class="tool-name">IMSI CATCHER</span>
+          <span class="tool-badge" style="color:var(--r);border-color:rgba(255,59,48,.3)">LEGAL</span>
+        </div>
+        <div class="tool-desc">
+          Detecta dispositivos celulares próximos capturando mensagens de paging GSM/LTE não cifradas. Registra IMSI, TMSI e IMEI quando disponíveis. Uso apenas para pesquisa e pentesting autorizado.
+        </div>
+        <div class="tool-uses">
+          <span class="tool-use">GSM 900/1800</span>
+          <span class="tool-use">LTE 700/850</span>
+          <span class="tool-use">TMSI/IMSI</span>
+          <span class="tool-use">Detecção passiva</span>
+        </div>
+        <a href="/imsi-catcher.html" class="tool-btn r">→ ABRIR IMSI</a>
+      </div>
+
+      <!-- WiFi Doppler -->
+      <div class="tool-card">
+        <div class="tool-head">
+          <span class="tool-icon">🌐</span>
+          <span class="tool-name">DOPPLER WIFI</span>
+          <span class="tool-badge">2.437 GHz</span>
+        </div>
+        <div class="tool-desc">
+          Detecta presença e movimento humano usando variação passiva do RSSI WiFi. O sinal do roteador atravessa o corpo e é refletido — a variação (micro-Doppler) revela respiração e batimentos a distância.
+        </div>
+        <div class="tool-uses">
+          <span class="tool-use">Detecção passiva</span>
+          <span class="tool-use">Sem HackRF</span>
+          <span class="tool-use">Micro-Doppler</span>
+          <span class="tool-use">Privacidade máxima</span>
+        </div>
+        <a href="#liveMon" class="tool-btn" onclick="document.getElementById('liveMon').scrollIntoView({behavior:'smooth'});return false">→ VER AO VIVO</a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══ MINI VITAIS ════════════════════════════════════════════════ -->
+  <section id="liveMon">
+    <div class="sec-bar">SINAIS AO VIVO</div>
+    <div class="live-grid">
+
+      <div class="mini-panel">
+        <div class="mini-title">RESPIRAÇÃO</div>
+        <canvas class="mini" id="respMini" width="600" height="60"></canvas>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px">
+          <span style="font-size:28px;font-weight:700;color:var(--g);text-shadow:var(--glow-g);font-variant-numeric:tabular-nums" id="mRespBpm">—</span>
+          <span style="font-size:11px;color:var(--g3)">RPM</span>
+          <span style="font-size:9px;color:var(--g3);margin-left:6px" id="mRespFonte">—</span>
+        </div>
+      </div>
+
+      <div class="mini-panel">
+        <div class="mini-title">BATIMENTOS</div>
+        <canvas class="mini" id="cardMini" width="600" height="60"></canvas>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px">
+          <span style="font-size:28px;font-weight:700;color:var(--y);text-shadow:var(--glow-y);font-variant-numeric:tabular-nums" id="mCardBpm">—</span>
+          <span style="font-size:11px;color:var(--y2)">BPM</span>
+          <span style="font-size:9px;color:var(--g3);margin-left:6px" id="mCardFonte">—</span>
+        </div>
+      </div>
+
+      <div class="mini-panel">
+        <div class="mini-title">RSSI WIFI</div>
+        <canvas class="mini" id="rssiMini" width="600" height="60"></canvas>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px">
+          <span style="font-size:28px;font-weight:700;color:var(--b);text-shadow:var(--glow-b);font-variant-numeric:tabular-nums" id="mRssiVal">—</span>
+          <span style="font-size:11px;color:var(--b2)">dBm</span>
+          <span style="font-size:9px;margin-left:8px" id="mAtividade">—</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══ ESPECTRO MINI ═══════════════════════════════════════════════ -->
+  <section>
+    <div class="sec-bar">ESPECTRO RF — 88 MHz A 900 MHz <span id="espectroStatus" style="margin-left:8px;font-size:9px;color:var(--g3)"></span></div>
+    <div class="spectrum-wrap">
+      <div class="wf-outer">
+        <canvas id="waterfallCanvas" width="1200" height="120"></canvas>
+      </div>
+      <div class="wf-labels">
+        <span>88 MHz</span><span>200 MHz</span><span>400 MHz</span>
+        <span>600 MHz</span><span>800 MHz</span><span>900 MHz</span>
+      </div>
+      <div class="cw"><canvas id="spectrumCanvas" width="1200" height="70"></canvas></div>
+    </div>
+  </section>
+
+  <!-- ══ REFERÊNCIA DE FREQUÊNCIAS ══════════════════════════════════ -->
+  <section>
+    <div class="sec-bar">REFERÊNCIA DE FREQUÊNCIAS</div>
+    <div class="guide-grid">
+
+      <div class="guide-card" style="padding:0;overflow:hidden">
+        <table class="freq-table">
+          <thead>
+            <tr>
+              <th></th><th>FAIXA</th><th>USO</th><th>COMO USAR</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="dot-band" style="background:#4FAFFF"></span></td>
+              <td class="freq-range">88–108 MHz</td>
+              <td class="freq-name">Rádio FM</td>
+              <td class="freq-use">→ Rádio FM</td>
+            </tr>
+            <tr>
+              <td><span class="dot-band" style="background:#00FFCC"></span></td>
+              <td class="freq-range">108–136 MHz</td>
+              <td class="freq-name">Aviação VHF</td>
+              <td class="freq-use">→ Scanner</td>
+            </tr>
+            <tr>
+              <td><span class="dot-band" style="background:#47DF7F"></span></td>
+              <td class="freq-range">137–175 MHz</td>
+              <td class="freq-name">VHF / NOAA</td>
+              <td class="freq-use">→ Escutar</td>
+            </tr>
+            <tr>
+              <td><span class="dot-band" style="background:#F5D800"></span></td>
+              <td class="freq-range">26–27 MHz</td>
+              <td class="freq-name">CB Radio</td>
+              <td class="freq-use">→ Clonar</td>
+            </tr>
+            <tr>
+              <td><span class="dot-band" style="background:#FF8C33"></span></td>
+              <td class="freq-range">300–433 MHz</td>
+              <td class="freq-name">Controles remoto</td>
+              <td class="freq-use">→ Clonar TX</td>
+            </tr>
+            <tr>
+              <td><span class="dot-band" style="background:#FF4444"></span></td>
+              <td class="freq-range">433 MHz</td>
+              <td class="freq-name">Portões / IoT</td>
+              <td class="freq-use">→ Replay Attack</td>
+            </tr>
+            <tr>
+              <td><span class="dot-band" style="background:#AF6FFF"></span></td>
+              <td class="freq-range">700–900 MHz</td>
+              <td class="freq-name">GSM / LTE</td>
+              <td class="freq-use">→ IMSI Catcher</td>
+            </tr>
+            <tr>
+              <td><span class="dot-band" style="background:#FF44AA"></span></td>
+              <td class="freq-range">2400–2484 MHz</td>
+              <td class="freq-name">WiFi / BT</td>
+              <td class="freq-use">→ Doppler</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="guide-card">
+        <div class="guide-title">// COMO USAR O HACKRF</div>
+
+        <div class="guide-step">
+          <span class="step-num">1</span>
+          <div class="step-body">
+            <strong>Conecte o HackRF One</strong> via USB. O sistema detecta automaticamente.
+            Verifique o indicador <code>HRF: ATIVO</code> no topo da tela.
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <span class="step-num">2</span>
+          <div class="step-body">
+            Para <strong>escutar rádio FM</strong>: abra Rádio FM, selecione a frequência
+            (ex: <code>98.1 MHz</code>) e clique em Escutar.
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <span class="step-num">3</span>
+          <div class="step-body">
+            Para <strong>clonar um controle remoto</strong>: abra Rádio, vá em "Clonar Sinal",
+            insira a frequência (ex: <code>433.92 MHz</code>), aperte o botão do controle
+            e clique em Capturar por 2 segundos.
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <span class="step-num">4</span>
+          <div class="step-body">
+            Para <strong>retransmitir</strong> (replay attack): após capturar,
+            selecione o arquivo em "Transmitir" e clique em Transmitir.
+            Certifique-se de ter licença de radioamador.
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <span class="step-num">5</span>
+          <div class="step-body">
+            Para <strong>monitorar saúde</strong>: abra Health Monitor.
+            Conecte AirPods Pro para máxima precisão dos batimentos cardíacos.
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <span class="step-num">6</span>
+          <div class="step-body">
+            Para <strong>rastrear celulares</strong>: abra IMSI Catcher.
+            Aceite os termos de uso e inicie o scan na banda GSM/LTE da sua região.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    <span>SINALRF v2.0</span>
+    <span style="color:var(--g3);opacity:.5">//</span>
+    <span id="footFps">— fps</span>
+    <span style="color:var(--g3);opacity:.5">//</span>
+    <span id="footFonte">simulação</span>
+    <span style="color:var(--g3);opacity:.5">//</span>
+    <a href="/radio.html">📻 RÁDIO</a>
+    <span style="color:var(--g3);opacity:.5">//</span>
+    <a href="/scanner.html">🌌 SCANNER</a>
+    <span style="color:var(--g3);opacity:.5">//</span>
+    <a href="/3d.html">🔮 3D</a>
+    <span style="color:var(--g3);opacity:.5">//</span>
+    <a href="/health.html">❤️ SAÚDE</a>
+    <span style="color:var(--g3);opacity:.5">//</span>
+    <a href="/imsi-catcher.html">📱 IMSI</a>
+    <span style="color:var(--g3);opacity:.5">//</span>
+    <a href="/intercept.html">🔴 INTERCEPTAÇÃO</a>
+  </footer>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+/* Dashboard index — mini panels + status strip */
+const $ = id => document.getElementById(id);
+
+/* mini canvas buffers */
+const respHist = new Array(120).fill(0);
+const cardHist = new Array(120).fill(0);
+const rssiHist = new Array(120).fill(-70);
+
+let lastFrame = null;
+let fps = 0;
+let tUlt = performance.now();
+
+function onFrame(f) {
+  lastFrame = f;
+  const now = performance.now();
+  fps = Math.round(1000 / (now - tUlt));
+  tUlt = now;
+
+  /* status strip */
+  $('sRssi').textContent   = f.rssi != null ? f.rssi + ' dBm' : '—';
+  $('sBpm').textContent    = f.batimentos?.bpm ? Math.round(f.batimentos.bpm) : '—';
+  $('sResp').textContent   = f.respiracao?.bpm ? Math.round(f.respiracao.bpm) : '—';
+
+  const det = f.presenca?.detectado;
+  const atv = f.presenca?.atividade || '';
+  const presEl = $('sPresenca');
+  presEl.textContent = det ? (atv === 'ativo' ? 'ATIVO' : atv === 'movendo' ? 'MOVENDO' : 'DETECTADO') : 'VAZIO';
+  presEl.style.color = det ? (atv === 'ativo' ? 'var(--r)' : atv === 'movendo' ? 'var(--y)' : 'var(--g)') : 'var(--g3)';
+
+  const esp = f.espectro || {};
+  $('sGhost').textContent = (esp.anomalos || []).length;
+
+  /* vitais mini */
+  $('mRespBpm').textContent   = f.respiracao?.bpm ? Math.round(f.respiracao.bpm) : '—';
+  $('mRespFonte').textContent = f.respiracao?.fonte ? '[' + f.respiracao.fonte + ']' : '';
+  $('mCardBpm').textContent   = f.batimentos?.bpm ? Math.round(f.batimentos.bpm) : '—';
+  $('mCardFonte').textContent = f.batimentos?.fonte ? '[' + f.batimentos.fonte + ']' : '';
+  $('mRssiVal').textContent   = f.rssi != null ? f.rssi : '—';
+
+  const atvEl = $('mAtividade');
+  atvEl.textContent = atv ? atv.toUpperCase() : '—';
+  atvEl.style.color = atv === 'ativo' ? 'var(--r)' : atv === 'movendo' ? 'var(--y)' : 'var(--g3)';
+
+  /* footer */
+  $('footFps').textContent   = fps + ' fps';
+  $('footFonte').textContent = f.fonte || 'sim';
+
+  /* push to hist */
+  respHist.push(f.respiracao?.bpm || 0); respHist.shift();
+  cardHist.push(f.batimentos?.bpm || 0); cardHist.shift();
+  rssiHist.push(f.rssi || -70); rssiHist.shift();
+}
+
+/* Hook into app.js — override atualizarHUD to also call onFrame */
+const _origHUD = window.atualizarHUD;
+window.atualizarHUD = function(f) {
+  if (_origHUD) _origHUD(f);
+  onFrame(f);
+};
+
+/* Mini canvas drawing */
+function drawLine(canvasId, data, color, min, max) {
+  const cv = $(canvasId); if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.globalAlpha = .85;
+  ctx.beginPath();
+  const range = (max - min) || 1;
+  data.forEach((v, i) => {
+    const x = i / (data.length - 1) * W;
+    const y = H - ((v - min) / range * (H - 8) + 4);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawMini() {
+  drawLine('respMini', respHist, '#47DF7F', 0, 30);
+  drawLine('cardMini', cardHist, '#F5D800', 40, 120);
+  const rssiMin = Math.min(...rssiHist) - 2;
+  const rssiMax = Math.max(...rssiHist) + 2;
+  drawLine('rssiMini', rssiHist, '#4FAFFF', rssiMin, rssiMax);
+  requestAnimationFrame(drawMini);
+}
+drawMini();
+</script>
+</body>
+</html>
