@@ -298,9 +298,9 @@
       Cobre 88–108 MHz de uma vez — todos os canais ao mesmo tempo.
     </div>
     <div class="em-freq-presets">
-      <button class="em-freq-btn" id="em-btn-todas"          onclick="emFreqPreset('todas',this)">📡 TODAS (101)</button>
-      <button class="em-freq-btn active" id="em-btn-principais" onclick="emFreqPreset('principais',this)">★ PRINCIPAIS (24)</button>
-      <button class="em-freq-btn"                               onclick="emFreqPreset('limpar',this)">✕ Limpar</button>
+      <button class="em-freq-btn active" id="em-btn-todas"     onclick="emFreqPreset('todas',this)">📡 TODAS (101)</button>
+      <button class="em-freq-btn" id="em-btn-principais"       onclick="emFreqPreset('principais',this)">★ PRINCIPAIS (24)</button>
+      <button class="em-freq-btn"                              onclick="emFreqPreset('limpar',this)">✕ Limpar</button>
     </div>
     <div id="em-freq-lista"></div>
     <div class="em-counter"><span id="em-freq-count">0</span> canais simultâneos selecionados</div>
@@ -625,9 +625,8 @@ async function emPoll() {
 /* ── Init ───────────────────────────────────────────────────── */
 window.addEventListener('DOMContentLoaded', () => {
   emCarregarContatos();
-  // Preset inicial: principais (passa o botão como referência)
-  const btnPrincipais = document.getElementById('em-btn-principais');
-  emFreqPreset('principais', btnPrincipais);
+  // Preset inicial: TODAS as rádios (banda FM inteira 88–108 MHz)
+  emFreqPreset('todas', document.getElementById('em-btn-todas'));
 });
 </script>
 </body>
