@@ -1385,6 +1385,170 @@ async def ws_llm(ws: WebSocket):
         pass
 
 
+# ─── Emergência: contatos e SMS ───────────────────────────────────────────────
+
+_CONTATOS_PATH = Path(__file__).parent / "contatos_emergencia.json"
+
+_sms_status: dict = {"enviados": 0, "falhas": 0, "pendentes": 0, "ativo": False, "log": []}
+
+
+def _carregar_contatos() -> list:
+    if _CONTATOS_PATH.exists():
+        try:
+            return json.loads(_CONTATOS_PATH.read_text())
+        except Exception:
+            return []
+    return []
+
+
+def _salvar_contatos(lista: list):
+    _CONTATOS_PATH.write_text(json.dumps(lista, ensure_ascii=False, indent=2))
+
+
+@app.get("/api/emergencia/contatos")
+async def contatos_listar():
+    return {"contatos": _carregar_contatos()}
+
+
+@app.post("/api/emergencia/contatos")
+async def contatos_salvar(body: dict):
+    lista = body.get("contatos", [])
+    _salvar_contatos(lista)
+    return {"ok": True, "total": len(lista)}
+
+
+async def _enviar_sms_twilio(para: str, mensagem: str) -> dict:
+    import urllib.request, urllib.parse, base64
+    account_sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
+    auth_token  = os.environ.get("TWILIO_AUTH_TOKEN", "")
+    from_number = os.environ.get("TWILIO_FROM_NUMBER", "")
+    if not all([account_sid, auth_token, from_number]):
+        return {"ok": False, "erro": "Twilio não configurado — adicione TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN e TWILIO_FROM_NUMBER ao .env"}
+    url  = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+    data = urllib.parse.urlencode({"To": para, "From": from_number, "Body": mensagem}).encode()
+    cred = base64.b64encode(f"{account_sid}:{auth_token}".encode()).decode()
+    req  = urllib.request.Request(url, data=data, headers={
+        "Authorization": f"Basic {cred}",
+        "Content-Type":  "application/x-www-form-urlencoded",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            r = json.loads(resp.read())
+            return {"ok": True, "sid": r.get("sid", "")}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
+
+
+async def _disparar_sms_async(mensagem: str, contatos: list):
+    _sms_status.update({"enviados": 0, "falhas": 0, "pendentes": len(contatos), "ativo": True, "log": []})
+    for c in contatos:
+        tel = c.get("telefone", "")
+        if not tel:
+            _sms_status["pendentes"] = max(0, _sms_status["pendentes"] - 1)
+            continue
+        r = await _enviar_sms_twilio(tel, mensagem)
+        entry = {"nome": c.get("nome", tel), "telefone": tel, **r}
+        _sms_status["log"].append(entry)
+        if r["ok"]:
+            _sms_status["enviados"] += 1
+        else:
+            _sms_status["falhas"] += 1
+        _sms_status["pendentes"] = max(0, _sms_status["pendentes"] - 1)
+    _sms_status["ativo"] = False
+
+
+@app.post("/api/emergencia/sms")
+async def emergencia_sms(body: dict):
+    """Dispara SMS para contatos. Body: { mensagem, contatos? }"""
+    mensagem = body.get("mensagem", "").strip()
+    if not mensagem:
+        raise HTTPException(400, "mensagem vazia")
+    contatos = body.get("contatos") or _carregar_contatos()
+    if not contatos:
+        raise HTTPException(400, "nenhum contato cadastrado")
+    asyncio.create_task(_disparar_sms_async(mensagem, contatos))
+    return {"ok": True, "total": len(contatos)}
+
+
+@app.get("/api/emergencia/sms/status")
+async def emergencia_sms_status():
+    return _sms_status
+
+
+@app.post("/api/emergencia/disparar")
+async def emergencia_disparar(body: dict):
+    """
+    Dispara FM broadcast + SMS simultaneamente.
+    Body: { "texto": "...", "voz": "Luciana", "repeticoes": 2,
+            "freqs_mhz": [...], "ganho": 47, "contatos": [...] }
+    """
+    if _emergencia["ativo"]:
+        raise HTTPException(409, "Broadcast FM já em andamento — pare antes de disparar novamente")
+
+    texto = body.get("texto", "").strip()
+    if not texto:
+        raise HTTPException(400, "texto vazio")
+
+    voz       = body.get("voz", "Luciana")
+    repeticoes = max(1, min(6, int(body.get("repeticoes", 2))))
+    ganho     = max(20, min(47, int(body.get("ganho", 47))))
+    freqs_mhz = body.get("freqs_mhz") or [round(88.0 + i * 0.2, 1) for i in range(101)]
+
+    loop = asyncio.get_event_loop()
+
+    # 1. TTS → WAV
+    try:
+        import io as _io, wave as _wave
+        wav_bytes = await loop.run_in_executor(None, _tts_para_wav, texto, voz)
+        with _wave.open(_io.BytesIO(wav_bytes), "rb") as wf:
+            sr = wf.getframerate()
+            raw = wf.readframes(wf.getnframes())
+        silencio = b"\x00\x00" * sr
+        pcm_total = (raw + silencio) * repeticoes
+        buf = _io.BytesIO()
+        with _wave.open(buf, "wb") as wf2:
+            wf2.setnchannels(1); wf2.setsampwidth(2); wf2.setframerate(sr)
+            wf2.writeframes(pcm_total)
+        wav_final = buf.getvalue()
+    except Exception as e:
+        raise HTTPException(500, f"TTS falhou: {e}")
+
+    # 2. WAV → IQ FM
+    try:
+        iq_bytes = await loop.run_in_executor(None, _modular_fm_iq, wav_final)
+    except Exception as e:
+        raise HTTPException(500, f"Modulação FM falhou: {e}")
+
+    sinais_path = Path(__file__).parent / "sinais"
+    sinais_path.mkdir(exist_ok=True)
+    iq_path = str(sinais_path / "_emergencia.iq")
+    with open(iq_path, "wb") as f:
+        f.write(iq_bytes)
+    _emergencia["iq_arquivo"] = iq_path
+
+    # 3. FM broadcast em thread
+    freqs_hz = [int(f * 1e6) for f in freqs_mhz]
+    _emergencia["_parar"].clear()
+    t = threading.Thread(target=_broadcast_thread, args=(freqs_hz, ganho, iq_path),
+                         daemon=True, name="emergencia-broadcast")
+    t.start()
+    _emergencia["_thread"] = t
+
+    # 4. SMS em paralelo (não bloqueia o FM)
+    contatos = body.get("contatos") or _carregar_contatos()
+    if contatos:
+        asyncio.create_task(_disparar_sms_async(texto, contatos))
+
+    duracao_s = len(iq_bytes) / (2 * 2_000_000)
+    return {
+        "ok": True,
+        "fm_freqs":      len(freqs_mhz),
+        "sms_contatos":  len(contatos),
+        "duracao_audio": round(duracao_s, 1),
+        "repeticoes":    repeticoes,
+    }
+
+
 app.mount("/", StaticFiles(directory=str(UI_PATH), html=True), name="ui")
 
 if __name__ == "__main__":

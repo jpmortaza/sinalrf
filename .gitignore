@@ -34,5 +34,8 @@ rssi_reader
 *.key
 *.pem
 
+# Contatos de emergência (dados pessoais — não commitar)
+contatos_emergencia.json
+
 # Build artifacts
 .deps_build/

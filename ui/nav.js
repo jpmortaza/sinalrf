@@ -12,7 +12,8 @@
     { href: '/3d.html',        label: '3D RF',        icon: '🔮' },
     { href: '/doppler.html',   label: 'DOPPLER',      icon: '🫀' },
     { href: '/health.html',    label: 'SAÚDE',        icon: '❤️'  },
-    { href: '/intercept.html', label: 'IMSI · INTCP', icon: '📱' },
+    { href: '/intercept.html',  label: 'IMSI · INTCP', icon: '📱' },
+    { href: '/emergencia.html', label: 'EMERGÊNCIA',   icon: '🚨' },
   ];
 
   /* ── Detectar página ativa ───────────────────────────────────── */
