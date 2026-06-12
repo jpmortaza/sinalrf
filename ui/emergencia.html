@@ -292,16 +292,20 @@
 
   <!-- FM -->
   <div class="em-card">
-    <h3>📻 Canais FM</h3>
+    <h3>📻 Canais FM — MODO SIMULTÂNEO</h3>
+    <div style="font-size:11px;color:#4488ff;margin-bottom:10px;line-height:1.6;border-left:2px solid #4488ff;padding-left:8px;">
+      Composite IQ · 20 Msps · Centro 98 MHz<br>
+      Cobre 88–108 MHz de uma vez — todos os canais ao mesmo tempo.
+    </div>
     <div class="em-freq-presets">
-      <button class="em-freq-btn active" onclick="emFreqPreset('todas')">📡 TODAS (88–108)</button>
-      <button class="em-freq-btn"        onclick="emFreqPreset('principais')">★ PRINCIPAIS (24)</button>
-      <button class="em-freq-btn"        onclick="emFreqPreset('limpar')">✕ Limpar</button>
+      <button class="em-freq-btn" id="em-btn-todas"          onclick="emFreqPreset('todas',this)">📡 TODAS (101)</button>
+      <button class="em-freq-btn active" id="em-btn-principais" onclick="emFreqPreset('principais',this)">★ PRINCIPAIS (24)</button>
+      <button class="em-freq-btn"                               onclick="emFreqPreset('limpar',this)">✕ Limpar</button>
     </div>
     <div id="em-freq-lista"></div>
-    <div class="em-counter"><span id="em-freq-count">0</span> frequências selecionadas</div>
+    <div class="em-counter"><span id="em-freq-count">0</span> canais simultâneos selecionados</div>
     <div class="em-add-row" style="margin-top:10px;">
-      <input class="em-input" id="em-freq-custom" type="number" step="0.1" min="88" max="108" placeholder="MHz personalizado (ex: 93.7)">
+      <input class="em-input" id="em-freq-custom" type="number" step="0.1" min="88" max="108" placeholder="MHz (ex: 93.7)">
       <button class="em-btn-sm" onclick="emFreqAdd()">+ ADD</button>
     </div>
   </div>
@@ -328,20 +332,20 @@
     <h3>Status do Broadcast</h3>
     <div class="em-status-grid">
       <div class="em-status-bloco">
-        <h4>📻 FM Broadcast</h4>
+        <h4>📻 FM Broadcast Simultâneo</h4>
         <div class="em-progress-wrap">
           <div class="em-progress-fill" id="em-fm-bar"></div>
         </div>
         <div class="em-status-txt" id="em-fm-txt">Aguardando disparo...</div>
         <div class="em-status-counters">
-          <div class="em-counter-item ok">
-            <span id="em-fm-ok">—</span>concluídas
+          <div class="em-counter-item" style="color:#4488ff">
+            <span id="em-fm-canais" style="font-size:18px;font-weight:bold;display:block">—</span>canais
           </div>
-          <div class="em-counter-item pend">
-            <span id="em-fm-pend">—</span>restantes
+          <div class="em-counter-item" style="color:#88aaff">
+            <span id="em-fm-freq" style="font-size:14px;font-weight:bold;display:block">—</span>centro MHz
           </div>
-          <div class="em-counter-item">
-            <span id="em-fm-freq" style="color:#88aaff;font-size:14px">—</span>freq atual
+          <div class="em-counter-item" style="color:#aaaaff">
+            <span id="em-fm-sr" style="font-size:14px;font-weight:bold;display:block">—</span>Msps
           </div>
         </div>
       </div>
@@ -387,10 +391,10 @@
 const TEMPLATES = {
   enchente:     'ATENCAO. DEFESA CIVIL. ALERTA DE ENCHENTE. Nivel do rio em ascensao. Evacuacao imediata das areas de varzea e margens do rio. Procure abrigos elevados. Nao atravesse areas alagadas. Ligue 199.',
   incendio:     'ATENCAO. DEFESA CIVIL. ALERTA DE INCENDIO. Foco de incendio identificado na regiao. Evacue imediatamente afastando-se do vento. Feche portas e janelas. Ligue 193 para o Corpo de Bombeiros.',
-  tornado:      'ATENCAO. DEFESA CIVIL. ALERTA DE TEMPESTADE SEVERA. Previsao de ventos extremos e granizo. Abrigues-e em construcoes solidas. Afaste-se de janelas. Nao permita sob arvores ou postes. Ligue 199.',
+  tornado:      'ATENCAO. DEFESA CIVIL. ALERTA DE TEMPESTADE SEVERA. Previsao de ventos extremos e granizo. Abrigue-se em construcoes solidas. Afaste-se de janelas e arvores. Ligue 199.',
   evacuacao:    'ATENCAO. DEFESA CIVIL. ORDEM DE EVACUACAO. Esta area esta em perigo imediato. Abandone sua residencia agora. Siga as sinalizacoes de evacuacao. Leve documentos e medicamentos essenciais. Ligue 199.',
   sismo:        'ATENCAO. DEFESA CIVIL. ALERTA DE ATIVIDADE SISMICA. Risco de tremores na regiao. Afaste-se de edificacoes danificadas e areas costeiras. Evite usar elevadores. Fique em local aberto e seguro.',
-  contaminacao: 'ATENCAO. DEFESA CIVIL. ALERTA DE CONTAMINACAO AMBIENTAL. Vazamento identificado na regiao. Permanceca em local fechado. Feche janelas e ventilacoes. Nao consuma agua da torneira. Aguarde instrucoes. Ligue 199.',
+  contaminacao: 'ATENCAO. DEFESA CIVIL. ALERTA DE CONTAMINACAO AMBIENTAL. Vazamento identificado na regiao. Permaneca em local fechado. Feche janelas e ventilacoes. Nao consuma agua da torneira. Aguarde instrucoes. Ligue 199.',
 };
 
 function emTpl(tipo) {
@@ -398,12 +402,9 @@ function emTpl(tipo) {
 }
 
 /* ── Nível de alerta ────────────────────────────────────────── */
-let _nivel = 'critico';
 function emSetNivel(n) {
-  _nivel = n;
   const bar = document.getElementById('em-topbar');
-  bar.className = '';
-  bar.classList.add(n);
+  bar.className = n;
   const labels = { critico: '🚨 CRÍTICO', urgente: '⚠ URGENTE', atencao: '⚡ ATENÇÃO' };
   document.getElementById('em-nivel-lbl').textContent = labels[n] || n;
   document.querySelectorAll('.em-nivel-btn').forEach(b =>
@@ -419,9 +420,9 @@ const PRINCIPAIS = [
 
 let _freqs = new Set();
 
-function emFreqPreset(tipo) {
+function emFreqPreset(tipo, btnEl) {
   document.querySelectorAll('.em-freq-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (btnEl) btnEl.classList.add('active');
   _freqs.clear();
   if (tipo === 'todas') {
     for (let f = 88.0; f <= 108.05; f = Math.round((f + 0.2) * 10) / 10) _freqs.add(f);
@@ -434,47 +435,48 @@ function emFreqPreset(tipo) {
 function emFreqAdd() {
   const v = parseFloat(document.getElementById('em-freq-custom').value);
   if (v >= 88 && v <= 108) { _freqs.add(Math.round(v * 10) / 10); emRenderFreqs(); }
+  document.getElementById('em-freq-custom').value = '';
 }
 
-function emFreqRemove(f) {
-  _freqs.delete(f);
-  emRenderFreqs();
-}
+function emFreqRemove(f) { _freqs.delete(f); emRenderFreqs(); }
 
 function emRenderFreqs() {
   const el = document.getElementById('em-freq-lista');
   const sorted = [..._freqs].sort((a, b) => a - b);
   el.innerHTML = sorted.map(f =>
-    `<span class="em-freq-tag" onclick="emFreqRemove(${f})" title="Remover">${f.toFixed(1)}</span>`
+    `<span class="em-freq-tag" onclick="emFreqRemove(${f})" title="Remover ${f.toFixed(1)} MHz">${f.toFixed(1)}</span>`
   ).join('');
   document.getElementById('em-freq-count').textContent = sorted.length;
 }
 
 /* ── Contatos ───────────────────────────────────────────────── */
-let _contatos = [];
+let _contatos  = [];
+let _smsAtivo  = false;
+let _pollTimer = null;
 
 async function emCarregarContatos() {
   try {
-    const r = await fetch('/api/emergencia/contatos');
-    const d = await r.json();
+    const d = await fetch('/api/emergencia/contatos').then(r => r.json());
     _contatos = d.contatos || [];
     emRenderContatos();
   } catch(e) {}
 }
 
 async function emSalvarContatos() {
-  await fetch('/api/emergencia/contatos', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contatos: _contatos }),
-  });
+  try {
+    await fetch('/api/emergencia/contatos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contatos: _contatos }),
+    });
+  } catch(e) {}
 }
 
 function emContatoAdd() {
   const nome = document.getElementById('em-c-nome').value.trim();
   const tel  = document.getElementById('em-c-tel').value.trim();
   if (!tel) return;
-  _contatos.push({ nome: nome || tel, telefone: tel, status: 'idle' });
+  _contatos.push({ nome: nome || tel, telefone: tel });
   document.getElementById('em-c-nome').value = '';
   document.getElementById('em-c-tel').value  = '';
   emRenderContatos();
@@ -489,8 +491,7 @@ function emContatoRemover(i) {
 
 function emRenderContatos(smsLog) {
   const logMap = {};
-  if (smsLog) smsLog.forEach(e => { logMap[e.telefone] = e; });
-
+  (smsLog || []).forEach(e => { logMap[e.telefone] = e; });
   const el = document.getElementById('em-contatos-lista');
   if (!_contatos.length) {
     el.innerHTML = '<div style="font-size:11px;color:#555;padding:8px 0">Nenhum contato. Adicione abaixo.</div>';
@@ -498,9 +499,7 @@ function emRenderContatos(smsLog) {
   }
   el.innerHTML = _contatos.map((c, i) => {
     const entry = logMap[c.telefone];
-    let cls = '';
-    if (entry) cls = entry.ok ? 'ok' : 'fail';
-    else if (_smsAtivo) cls = 'pending';
+    const cls = entry ? (entry.ok ? 'ok' : 'fail') : (_smsAtivo ? 'pending' : '');
     return `<div class="em-contato">
       <div class="em-dot ${cls}"></div>
       <span class="em-contato-nome">${c.nome}</span>
@@ -511,20 +510,21 @@ function emRenderContatos(smsLog) {
 }
 
 /* ── Disparar ───────────────────────────────────────────────── */
-let _smsAtivo = false;
-let _pollTimer = null;
-
 async function emDisparar() {
   const texto = document.getElementById('em-texto').value.trim();
   if (!texto) { alert('Digite a mensagem de emergência.'); return; }
   if (_freqs.size === 0 && _contatos.length === 0) {
-    alert('Selecione ao menos um canal FM ou um contato SMS.'); return;
+    alert('Selecione canais FM ou adicione contatos SMS.'); return;
   }
-  if (!confirm(`Disparar alerta de emergência?\n\n${_freqs.size} canais FM\n${_contatos.length} contatos SMS\n\nMensagem: "${texto.slice(0,80)}..."`)) return;
+
+  const n = _freqs.size, c = _contatos.length;
+  if (!confirm(`Disparar alerta de emergência?\n\n📻 ${n} canais FM simultâneos\n📱 ${c} contatos SMS\n\n"${texto.slice(0,100)}"`)) return;
 
   const btn = document.getElementById('em-btn-disparar');
   btn.disabled = true;
-  btn.textContent = '⏳ PREPARANDO ÁUDIO FM...';
+  btn.textContent = '⏳ Gerando TTS + IQ FM...';
+  document.getElementById('em-fm-txt').textContent = 'Gerando áudio TTS...';
+  document.getElementById('em-fm-bar').style.width = '10%';
 
   try {
     const r = await fetch('/api/emergencia/disparar', {
@@ -535,23 +535,28 @@ async function emDisparar() {
         voz:        document.getElementById('em-voz').value,
         repeticoes: parseInt(document.getElementById('em-repeticoes').value),
         ganho:      parseInt(document.getElementById('em-ganho').value),
-        freqs_mhz:  [..._freqs].sort((a,b)=>a-b),
+        freqs_mhz:  [..._freqs].sort((a, b) => a - b),
         contatos:   _contatos,
       }),
     });
     const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || 'Erro desconhecido');
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
 
-    btn.textContent = '🚨 EM TRANSMISSÃO...';
+    // Mostra info do broadcast simultâneo
+    document.getElementById('em-fm-canais').textContent = d.fm_canais  || n;
+    document.getElementById('em-fm-freq').textContent   = d.center_mhz || '98.0';
+    document.getElementById('em-fm-sr').textContent     = d.sr_msps    || '20';
+
+    btn.textContent = '🚨 TRANSMITINDO...';
     _smsAtivo = true;
     document.getElementById('em-btn-parar').style.display = 'block';
-    document.getElementById('em-topbar').classList.add('critico');
+    _pollTimer = setInterval(emPoll, 800);
 
-    _pollTimer = setInterval(emPoll, 1000);
   } catch(e) {
-    alert('Erro: ' + e.message);
+    alert('Erro ao disparar: ' + e.message);
     btn.disabled = false;
     btn.textContent = '🚨 DISPARAR ALERTA — FM + SMS';
+    document.getElementById('em-fm-bar').style.width = '0%';
   }
 }
 
@@ -559,10 +564,12 @@ async function emParar() {
   await fetch('/api/emergencia/parar', { method: 'POST' });
   clearInterval(_pollTimer);
   _smsAtivo = false;
-  document.getElementById('em-btn-disparar').disabled = false;
-  document.getElementById('em-btn-disparar').textContent = '🚨 DISPARAR ALERTA — FM + SMS';
+  const btn = document.getElementById('em-btn-disparar');
+  btn.disabled = false;
+  btn.textContent = '🚨 DISPARAR ALERTA — FM + SMS';
   document.getElementById('em-btn-parar').style.display = 'none';
   document.getElementById('em-fm-txt').textContent = 'Broadcast interrompido.';
+  document.getElementById('em-fm-bar').style.width = '0%';
 }
 
 async function emPoll() {
@@ -572,30 +579,29 @@ async function emPoll() {
       fetch('/api/emergencia/sms/status').then(r => r.json()),
     ]);
 
-    // FM
-    const pct = rf.freq_total > 0 ? (rf.freq_idx / rf.freq_total * 100) : 0;
-    document.getElementById('em-fm-bar').style.width = pct + '%';
+    // FM simultâneo: barra de progresso baseada em ativo/concluído
+    const fmPct = rf.ativo ? (rf.freq_idx > 0 ? 75 : 40) : (rf.progresso.includes('concluído') ? 100 : 0);
+    document.getElementById('em-fm-bar').style.width = fmPct + '%';
     document.getElementById('em-fm-txt').textContent = rf.progresso || '—';
-    document.getElementById('em-fm-ok').textContent   = rf.freq_idx   || '0';
-    document.getElementById('em-fm-pend').textContent = Math.max(0, rf.freq_total - rf.freq_idx) || '0';
-    document.getElementById('em-fm-freq').textContent = rf.freq_atual ? rf.freq_atual.toFixed(1) + ' MHz' : '—';
+    if (rf.freq_atual) document.getElementById('em-fm-freq').textContent = parseFloat(rf.freq_atual).toFixed(1);
 
     // SMS
-    const total_sms = sms.enviados + sms.falhas + sms.pendentes;
-    const pct_sms = total_sms > 0 ? ((sms.enviados + sms.falhas) / total_sms * 100) : 0;
-    document.getElementById('em-sms-bar').style.width  = pct_sms + '%';
+    const totalSms = sms.enviados + sms.falhas + sms.pendentes;
+    const smsPct = totalSms > 0 ? ((sms.enviados + sms.falhas) / totalSms * 100) : 0;
+    document.getElementById('em-sms-bar').style.width  = smsPct + '%';
     document.getElementById('em-sms-ok').textContent   = sms.enviados  || '0';
     document.getElementById('em-sms-fail').textContent = sms.falhas    || '0';
     document.getElementById('em-sms-pend').textContent = sms.pendentes || '0';
     document.getElementById('em-sms-txt').textContent  =
-      sms.ativo ? 'Enviando SMS...' :
-      (sms.enviados + sms.falhas > 0 ? `Concluído: ${sms.enviados} ok, ${sms.falhas} falhas` : 'Aguardando...');
+      sms.ativo ? `Enviando SMS... (${sms.enviados + sms.falhas}/${totalSms})` :
+      totalSms  ? `Concluído: ${sms.enviados} ok, ${sms.falhas} falhas` :
+                  'Aguardando disparo...';
 
     const log = document.getElementById('em-sms-log');
-    if (sms.log && sms.log.length) {
+    if (sms.log?.length) {
       log.innerHTML = sms.log.map(e =>
-        `<div class="em-sms-log-item ${e.ok?'ok':'fail'}">
-          ${e.ok ? '✓' : '✗'} ${e.nome} (${e.telefone}) ${e.ok ? '' : '— ' + (e.erro||'')}
+        `<div class="em-sms-log-item ${e.ok ? 'ok' : 'fail'}">
+          ${e.ok ? '✓' : '✗'} ${e.nome} (${e.telefone})${e.ok ? '' : ' — ' + (e.erro || 'erro')}
         </div>`
       ).join('');
       log.scrollTop = log.scrollHeight;
@@ -603,37 +609,25 @@ async function emPoll() {
 
     emRenderContatos(sms.log || []);
 
-    // Para polling quando ambos terminam
-    if (!rf.ativo && !sms.ativo && (rf.freq_idx > 0 || sms.enviados + sms.falhas > 0)) {
+    // Terminou?
+    if (!rf.ativo && !sms.ativo && (rf.progresso.includes('concluído') || rf.progresso.includes('interrompido'))) {
       clearInterval(_pollTimer);
       _smsAtivo = false;
-      document.getElementById('em-btn-disparar').disabled = false;
-      document.getElementById('em-btn-disparar').textContent = '🚨 DISPARAR ALERTA — FM + SMS';
+      const btn = document.getElementById('em-btn-disparar');
+      btn.disabled = false;
+      btn.textContent = '🚨 DISPARAR ALERTA — FM + SMS';
       document.getElementById('em-btn-parar').style.display = 'none';
+      document.getElementById('em-fm-bar').style.width = '100%';
     }
   } catch(e) {}
 }
 
 /* ── Init ───────────────────────────────────────────────────── */
-emFreqPreset = (function(orig) {
-  return function(tipo) {
-    // guarda target antes do event
-    const tgt = event && event.target;
-    _freqs.clear();
-    document.querySelectorAll('.em-freq-btn').forEach(b => b.classList.remove('active'));
-    if (tgt) tgt.classList.add('active');
-    if (tipo === 'todas') {
-      for (let f = 88.0; f <= 108.05; f = Math.round((f + 0.2) * 10) / 10) _freqs.add(f);
-    } else if (tipo === 'principais') {
-      PRINCIPAIS.forEach(f => _freqs.add(f));
-    }
-    emRenderFreqs();
-  };
-})(emFreqPreset);
-
 window.addEventListener('DOMContentLoaded', () => {
   emCarregarContatos();
-  setTimeout(() => emFreqPreset('principais'), 0);
+  // Preset inicial: principais (passa o botão como referência)
+  const btnPrincipais = document.getElementById('em-btn-principais');
+  emFreqPreset('principais', btnPrincipais);
 });
 </script>
 </body>

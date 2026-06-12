@@ -16,6 +16,13 @@ from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+# Carrega .env se existir (TWILIO_*, etc.)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).parent / ".env")
+except ImportError:
+    pass
+
 import numpy as np
 from scipy import signal as sp_signal
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
@@ -92,6 +99,75 @@ def _modular_fm_iq(wav_bytes: bytes,
     out[0::2] = np.clip(iq.real * 120, -127, 127).astype(np.int8)
     out[1::2] = np.clip(iq.imag * 120, -127, 127).astype(np.int8)
     return out.tobytes()
+
+
+def _modular_fm_multi(wav_bytes: bytes,
+                      freqs_mhz: list,
+                      center_mhz: float = 98.0,
+                      sr_iq: int = 20_000_000,
+                      deviation: int = 75_000) -> bytes:
+    """
+    Gera IQ com TODOS os portadores FM simultâneos.
+    center_mhz=98, sr_iq=20 Msps → cobre exatamente 88–108 MHz de uma vez.
+    Processa em chunks de 0.1 s para evitar OOM.
+    """
+    import io as _io, wave as _wave
+    with _wave.open(_io.BytesIO(wav_bytes), 'rb') as wf:
+        sr_audio = wf.getframerate()
+        n_ch = wf.getnchannels()
+        raw  = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
+    if n_ch > 1:
+        raw = raw[0::n_ch]
+
+    # Normaliza + pre-emphasis 75 µs (WFM)
+    mx = float(np.max(np.abs(raw))) + 1e-6
+    raw /= mx
+    bz, az = sp_signal.bilinear([75e-6, 0], [75e-6, 1], fs=float(sr_audio))
+    raw = sp_signal.lfilter(bz, az, raw)
+
+    k               = 2 * np.pi * deviation / sr_iq
+    offsets_hz      = [(f - center_mhz) * 1e6 for f in freqs_mhz]
+    n_carriers      = max(1, len(offsets_hz))
+    scale           = 110.0 / math.sqrt(n_carriers)   # amplitude estatística
+    dphi_per_carrier = [2 * math.pi * oh / sr_iq for oh in offsets_hz]
+
+    # Acumuladores de fase (mantém continuidade entre chunks)
+    fm_phase = 0.0
+    car_phase = [0.0] * n_carriers
+
+    CHUNK_S = 0.1                                      # 100 ms de áudio por chunk
+    chunk_a = max(1, int(CHUNK_S * sr_audio))
+    parts   = []
+
+    for start in range(0, len(raw), chunk_a):
+        chunk = raw[start:start + chunk_a]
+        n_iq  = int(round(len(chunk) * sr_iq / sr_audio))
+
+        # Resample áudio → taxa IQ (FFT-based: evita filtro polifásico gigante)
+        audio_up = sp_signal.resample(chunk, n_iq).astype(np.float32)
+        n = len(audio_up)
+
+        # FM modulation com fase contínua
+        delta     = audio_up * k
+        ph_vec    = fm_phase + np.cumsum(delta)
+        fm_phase  = float(ph_vec[-1])
+        baseband  = np.exp(1j * ph_vec).astype(np.complex64)
+
+        # Soma de portadores
+        t_idx     = np.arange(n, dtype=np.float64)
+        composite = np.zeros(n, dtype=np.complex64)
+        for ci, dphi in enumerate(dphi_per_carrier):
+            ph = car_phase[ci] + t_idx * dphi
+            car_phase[ci] = float(ph[-1] + dphi)
+            composite += baseband * np.exp(1j * ph).astype(np.complex64)
+
+        # Serializa int8 interleaved
+        out = np.zeros(n * 2, dtype=np.int8)
+        out[0::2] = np.clip(composite.real * scale, -127, 127).astype(np.int8)
+        out[1::2] = np.clip(composite.imag * scale, -127, 127).astype(np.int8)
+        parts.append(out.tobytes())
+
+    return b''.join(parts)
 
 
 # Estado do broadcast de emergência
@@ -1475,35 +1551,89 @@ async def emergencia_sms_status():
     return _sms_status
 
 
+def _broadcast_multi_thread(center_hz: int, sr_iq: int, ganho: int, iq_path: str, n_canais: int):
+    """Transmissão única cobrindo TODOS os canais FM simultaneamente."""
+    _emergencia["_parar"].clear()
+    _emergencia["ativo"]      = True
+    _emergencia["freq_total"] = 1
+    _emergencia["freq_idx"]   = 0
+    _emergencia["progresso"]  = f"Gerando IQ composto ({n_canais} canais)..."
+    _emergencia["freq_atual"] = center_hz / 1e6
+
+    hackrf_resource.zerar()
+    sensor_hackrf.pausar()
+    sensor_espectro.pausar()
+    sensor_intel.pausar()
+
+    if not hackrf_resource.acquire("emergencia", timeout=15.0):
+        hackrf_resource.zerar()
+        hackrf_resource.acquire("emergencia", timeout=5.0)
+
+    _emergencia["progresso"] = f"Transmitindo {n_canais} canais @ {center_hz/1e6:.0f} MHz centro"
+    _emergencia["freq_idx"]  = 1
+
+    try:
+        proc = subprocess.Popen(
+            ["hackrf_transfer",
+             "-t", iq_path,
+             "-f", str(center_hz),
+             "-s", str(sr_iq),
+             "-x", str(ganho),
+             "-a", "1"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        while proc.poll() is None:
+            if _emergencia["_parar"].is_set():
+                proc.terminate()
+                break
+            time.sleep(0.2)
+    except Exception as e:
+        print(f"  🚨  Erro broadcast multi: {e}")
+    finally:
+        hackrf_resource.release()
+
+    _emergencia["ativo"]     = False
+    _emergencia["progresso"] = "Broadcast concluído"
+    _emergencia["freq_atual"] = None
+    sensor_hackrf.retomar()
+    sensor_espectro.retomar()
+    sensor_intel.retomar()
+    print(f"  🚨  EMERGÊNCIA: broadcast simultâneo concluído ({n_canais} canais)")
+
+
 @app.post("/api/emergencia/disparar")
 async def emergencia_disparar(body: dict):
     """
-    Dispara FM broadcast + SMS simultaneamente.
-    Body: { "texto": "...", "voz": "Luciana", "repeticoes": 2,
-            "freqs_mhz": [...], "ganho": 47, "contatos": [...] }
+    Dispara FM broadcast SIMULTÂNEO em todos os canais + SMS em paralelo.
+    Body: { "texto", "voz", "repeticoes", "freqs_mhz", "ganho", "contatos" }
+    FM: composite IQ @ 20 Msps, center 98 MHz → cobre 88–108 MHz de uma vez.
     """
     if _emergencia["ativo"]:
-        raise HTTPException(409, "Broadcast FM já em andamento — pare antes de disparar novamente")
+        raise HTTPException(409, "Broadcast já em andamento — pare antes de novo disparo")
 
     texto = body.get("texto", "").strip()
     if not texto:
         raise HTTPException(400, "texto vazio")
 
-    voz       = body.get("voz", "Luciana")
+    voz        = body.get("voz", "Luciana")
     repeticoes = max(1, min(6, int(body.get("repeticoes", 2))))
-    ganho     = max(20, min(47, int(body.get("ganho", 47))))
-    freqs_mhz = body.get("freqs_mhz") or [round(88.0 + i * 0.2, 1) for i in range(101)]
+    ganho      = max(20, min(47, int(body.get("ganho", 47))))
+    freqs_mhz  = body.get("freqs_mhz") or [round(88.0 + i * 0.2, 1) for i in range(101)]
+    center_mhz = 98.0
+    sr_iq      = 20_000_000
 
     loop = asyncio.get_event_loop()
 
-    # 1. TTS → WAV
+    # 1. TTS → WAV com repetições
+    _emergencia["progresso"] = "Gerando áudio TTS..."
     try:
         import io as _io, wave as _wave
         wav_bytes = await loop.run_in_executor(None, _tts_para_wav, texto, voz)
         with _wave.open(_io.BytesIO(wav_bytes), "rb") as wf:
             sr = wf.getframerate()
             raw = wf.readframes(wf.getnframes())
-        silencio = b"\x00\x00" * sr
+        silencio  = b"\x00\x00" * sr                  # 1 s pausa
         pcm_total = (raw + silencio) * repeticoes
         buf = _io.BytesIO()
         with _wave.open(buf, "wb") as wf2:
@@ -1513,24 +1643,28 @@ async def emergencia_disparar(body: dict):
     except Exception as e:
         raise HTTPException(500, f"TTS falhou: {e}")
 
-    # 2. WAV → IQ FM
+    # 2. WAV → IQ FM COMPOSTO (todos os canais simultâneos @ 20 Msps)
+    _emergencia["progresso"] = f"Modulando FM composto ({len(freqs_mhz)} canais)..."
     try:
-        iq_bytes = await loop.run_in_executor(None, _modular_fm_iq, wav_final)
+        iq_bytes = await loop.run_in_executor(
+            None, _modular_fm_multi, wav_final, freqs_mhz, center_mhz, sr_iq
+        )
     except Exception as e:
         raise HTTPException(500, f"Modulação FM falhou: {e}")
 
     sinais_path = Path(__file__).parent / "sinais"
     sinais_path.mkdir(exist_ok=True)
-    iq_path = str(sinais_path / "_emergencia.iq")
+    iq_path = str(sinais_path / "_emergencia_multi.iq")
     with open(iq_path, "wb") as f:
         f.write(iq_bytes)
     _emergencia["iq_arquivo"] = iq_path
 
-    # 3. FM broadcast em thread
-    freqs_hz = [int(f * 1e6) for f in freqs_mhz]
-    _emergencia["_parar"].clear()
-    t = threading.Thread(target=_broadcast_thread, args=(freqs_hz, ganho, iq_path),
-                         daemon=True, name="emergencia-broadcast")
+    # 3. Thread de transmissão única (20 Msps, center 98 MHz)
+    t = threading.Thread(
+        target=_broadcast_multi_thread,
+        args=(int(center_mhz * 1e6), sr_iq, ganho, iq_path, len(freqs_mhz)),
+        daemon=True, name="emergencia-broadcast"
+    )
     t.start()
     _emergencia["_thread"] = t
 
@@ -1539,13 +1673,15 @@ async def emergencia_disparar(body: dict):
     if contatos:
         asyncio.create_task(_disparar_sms_async(texto, contatos))
 
-    duracao_s = len(iq_bytes) / (2 * 2_000_000)
+    duracao_s = len(iq_bytes) / (2 * sr_iq)
     return {
-        "ok": True,
-        "fm_freqs":      len(freqs_mhz),
+        "ok":            True,
+        "modo":          "simultaneo",
+        "fm_canais":     len(freqs_mhz),
+        "center_mhz":    center_mhz,
+        "sr_msps":       sr_iq / 1e6,
         "sms_contatos":  len(contatos),
         "duracao_audio": round(duracao_s, 1),
-        "repeticoes":    repeticoes,
     }
 
 
