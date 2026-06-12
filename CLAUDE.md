@@ -7,6 +7,30 @@ Backend Python + FastAPI. Frontend HTML/JS puro. WebSocket para streaming de dad
 
 ---
 
+## PROTOCOLO OBRIGATÓRIO ANTES DE QUALQUER EXECUÇÃO
+
+> **Este projeto roda em um Mac dedicado com HackRF físico e pode ter múltiplos agentes/sessões.**
+> Antes de implementar, refatorar ou executar qualquer tarefa, SEMPRE verifique:
+>
+> 1. **`registro.md`** — log de mudanças recentes, decisões e contexto atual
+> 2. **`CLAUDE.md`** (este arquivo) — regras, padrões e arquitetura
+> 3. **`base-conhecimento/`** — documentação de domínio e decisões técnicas
+
+Se qualquer um desses arquivos tiver sido atualizado desde a última sessão, leia-o antes de prosseguir.
+
+### Ao concluir uma tarefa significativa
+
+Registre no **TOPO** do `registro.md`:
+- O que foi pedido e por quem
+- O que foi feito (implementação, causa raiz se for fix)
+- Decisões tomadas e o porquê
+- Arquivos alterados
+- Pendências ou riscos identificados
+
+---
+
+---
+
 ## Arquitetura
 
 ```
