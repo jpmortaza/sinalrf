@@ -16,6 +16,25 @@
     { href: '/emergencia.html', label: 'EMERGÊNCIA',   icon: '🚨' },
   ];
 
+  /* ── Modo de HackRF por página (para o botão START) ──────────── */
+  const MODOS = {
+    '/':               'completo',
+    '/index.html':     'completo',
+    '/radio.html':     'radio',
+    '/scanner.html':   'scanner',
+    '/3d.html':        'completo',
+    '/doppler.html':   'doppler',
+    '/health.html':    'completo',
+    '/intercept.html': 'imsi',
+    '/emergencia.html':'emergencia',
+  };
+  function modoAtual() {
+    const p = location.pathname;
+    if (p === '/' || p === '/index.html') return 'completo';
+    for (const k in MODOS) { if (p.endsWith(k) && k !== '/') return MODOS[k]; }
+    return 'completo';
+  }
+
   /* ── Detectar página ativa ───────────────────────────────────── */
   function isActive(href) {
     const p = location.pathname;
@@ -49,6 +68,8 @@
       <a class="srf-logo" href="/">mtz<span>HRF</span></a>
       <nav class="srf-links">${links}</nav>
       <div class="srf-right">
+        <button class="srf-hk start" id="srfHkStart" title="Para o HackRF e inicia o processo desta página">▶ START</button>
+        <button class="srf-hk stop"  id="srfHkStop"  title="Para tudo e libera o HackRF">■ STOP</button>
         <div class="srf-ws">
           <span class="srf-ws-dot" id="srfWsDot"></span>
           <span id="srfWsLbl">OFF</span>
@@ -78,6 +99,48 @@
     // Toggle de tema
     document.getElementById('srfThemeBtn').addEventListener('click', () => {
       setTheme(getTheme() === 'neutral' ? 'black' : 'neutral');
+    });
+
+    // Botões START / STOP do HackRF
+    const btnStart = document.getElementById('srfHkStart');
+    const btnStop  = document.getElementById('srfHkStop');
+
+    btnStart.addEventListener('click', async () => {
+      const modo = modoAtual();
+      btnStart.disabled = true;
+      btnStart.textContent = '⏳ INICIANDO';
+      try {
+        const r = await fetch('/api/hackrf/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modo }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || 'erro');
+        btnStart.style.display = 'none';
+        btnStart.classList.add('ativo');
+        btnStop.style.display = 'inline-block';
+        window.srfNav.setHrf(true);
+      } catch (e) {
+        alert('Erro ao iniciar HackRF: ' + e.message);
+      } finally {
+        btnStart.disabled = false;
+        btnStart.textContent = '▶ START';
+      }
+    });
+
+    btnStop.addEventListener('click', async () => {
+      btnStop.disabled = true;
+      btnStop.textContent = '⏳ PARANDO';
+      try {
+        await fetch('/api/hackrf/stop', { method: 'POST' });
+      } catch (e) {}
+      btnStop.style.display = 'none';
+      btnStop.disabled = false;
+      btnStop.textContent = '■ STOP';
+      btnStart.style.display = 'inline-block';
+      btnStart.classList.remove('ativo');
+      window.srfNav.setHrf(false);
     });
   }
 

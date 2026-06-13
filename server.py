@@ -1685,6 +1685,60 @@ async def emergencia_disparar(body: dict):
     }
 
 
+# ─── Controle universal do HackRF (botão START/STOP de cada página) ───────────
+
+def _parar_tudo_hackrf():
+    """Para TODA atividade no HackRF e pausa todos os sensores."""
+    if _emergencia["ativo"]:
+        _emergencia["_parar"].set()
+    hackrf_resource.zerar()
+    try: sensor_imsi.parar_captura()
+    except Exception: pass
+    sensor_hackrf.pausar()
+    sensor_espectro.pausar()
+    sensor_intel.pausar()
+    subprocess.run(["pkill", "-9", "-f", "hackrf_transfer"], capture_output=True)
+
+
+@app.post("/api/hackrf/start")
+async def hackrf_start(body: dict):
+    """
+    Para tudo no HackRF e inicia o processo que a página pede.
+    Body: { "modo": "completo"|"scanner"|"doppler"|"imsi"|"radio"|"emergencia" }
+    """
+    modo = (body.get("modo") or "completo").lower()
+
+    # 1. Libera o HackRF de qualquer atividade anterior
+    _parar_tudo_hackrf()
+
+    # 2. Inicia o que esta página precisa
+    iniciados = []
+    if modo in ("completo", "dashboard", "3d", "saude", "health"):
+        sensor_hackrf.retomar(); sensor_espectro.retomar(); sensor_intel.retomar()
+        iniciados = ["wifi+doppler", "espectro", "intel"]
+    elif modo == "doppler":
+        sensor_hackrf.retomar()
+        iniciados = ["wifi+doppler"]
+    elif modo in ("scanner", "intel", "espectro"):
+        sensor_espectro.retomar(); sensor_intel.retomar()
+        iniciados = ["espectro", "intel"]
+    elif modo in ("imsi", "intercept"):
+        sensor_imsi.iniciar_captura()
+        iniciados = ["imsi/grgsm"]
+    elif modo in ("radio", "emergencia", "idle"):
+        # HackRF fica livre — a própria página assume (sintonizar / disparar)
+        iniciados = []
+
+    return {"ok": True, "modo": modo, "iniciados": iniciados, "dono": hackrf_resource.dono()}
+
+
+@app.post("/api/hackrf/stop")
+async def hackrf_stop():
+    """Para tudo no HackRF e devolve o dispositivo (todos os sensores pausados)."""
+    _parar_tudo_hackrf()
+    return {"ok": True, "livre": hackrf_resource.livre()}
+
+
 app.mount("/", StaticFiles(directory=str(UI_PATH), html=True), name="ui")
 
 if __name__ == "__main__":

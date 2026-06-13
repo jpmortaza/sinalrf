@@ -203,6 +203,23 @@ html:not([data-theme="neutral"]) body::before {
 }
 .srf-theme:hover { color: var(--g); }
 
+/* HackRF START / STOP */
+.srf-hk {
+  font-size: 9px; font-weight: 700; letter-spacing: .8px;
+  padding: 4px 10px; cursor: pointer;
+  border: 1px solid var(--border2); border-radius: 3px;
+  background: var(--bg2); color: var(--g3);
+  font-family: var(--font); white-space: nowrap;
+  transition: all .15s;
+}
+.srf-hk:hover { color: var(--g); border-color: var(--g3); }
+.srf-hk.start { color: var(--g);  border-color: var(--g3); }
+.srf-hk.start:hover { background: var(--g4); }
+.srf-hk.stop  { color: var(--r);  border-color: var(--r); display: none; }
+.srf-hk.stop:hover  { background: var(--r2); }
+.srf-hk.ativo { animation: srf-blink 1.4s step-end infinite; }
+.srf-hk:disabled { opacity: .5; cursor: wait; }
+
 /* ──────────────────────────────────────────────────────────────────
    UTILITÁRIOS COMUNS
    ────────────────────────────────────────────────────────────────── */
