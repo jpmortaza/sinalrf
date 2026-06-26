@@ -14,10 +14,29 @@ API pública
     livre()                 → bool      True se disponível
 """
 
+import sys
 import threading
 import subprocess
 import time
 from typing import Optional
+
+
+# ── Kill cross-platform ──────────────────────────────────────────────────────────
+def matar(*nomes: str):
+    """Mata processos por nome, funcionando em Windows, macOS e Linux.
+
+    No Windows usa taskkill por nome de imagem (.exe); em Unix usa pkill -f.
+    Erros (binário ausente, processo inexistente) são ignorados.
+    """
+    for nome in nomes:
+        try:
+            if sys.platform == "win32":
+                subprocess.run(["taskkill", "/F", "/T", "/IM", f"{nome}.exe"],
+                               capture_output=True)
+            else:
+                subprocess.run(["pkill", "-9", "-f", nome], capture_output=True)
+        except (OSError, subprocess.SubprocessError):
+            pass
 
 # ── Estado global ──────────────────────────────────────────────────────────────
 _lock   = threading.Lock()
@@ -62,9 +81,7 @@ def zerar():
     Mata TODOS os processos que usam o HackRF e reseta o estado.
     Use antes de iniciar qualquer atividade exclusiva (IMSI, radio, tx).
     """
-    subprocess.run(['pkill', '-9', '-f', 'hackrf_transfer'], capture_output=True)
-    subprocess.run(['pkill', '-9', '-f', 'hackrf_sweep'],    capture_output=True)
-    subprocess.run(['pkill', '-9', '-f', 'grgsm'],           capture_output=True)
+    matar('hackrf_transfer', 'hackrf_sweep', 'grgsm')
     time.sleep(0.6)   # aguarda kernel fechar os file descriptors do USB
     # Se o lock estiver preso (processo morreu sem liberar), força reset
     global _owner, _ts

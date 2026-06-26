@@ -124,7 +124,7 @@ class ScannerIMSI:
         try:
             r = subprocess.run(['hackrf_info'], capture_output=True, text=True, timeout=3)
             self.hackrf_ok = 'Serial number' in r.stdout or 'Found HackRF' in r.stdout
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except (OSError, subprocess.TimeoutExpired):
             pass
 
         import os
@@ -144,7 +144,7 @@ class ScannerIMSI:
                 self.grgsm_ok  = True
                 self.grgsm_cmd = list(cand)   # lista: ['python3', '/path/grgsm_fixed.py'] ou ['grgsm_livemon_headless']
                 break
-            except (FileNotFoundError, subprocess.TimeoutExpired):
+            except (OSError, subprocess.TimeoutExpired):
                 pass
 
         print(f"  📱  IMSI Scanner — HackRF={'✓' if self.hackrf_ok else '✗'}  "

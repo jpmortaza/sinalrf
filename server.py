@@ -4,6 +4,16 @@ mtzHRF — Plataforma de Sensoriamento RF + Áudio
 WiFi RSSI · HackRF Espectro · Doppler Corporal · Radar Acústico
 """
 
+import sys
+
+# Windows: o console usa cp1252 por padrão e quebra ao imprimir emojis (📡 ⚠ …).
+# Força UTF-8 na saída para o servidor rodar em qualquer plataforma.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 import asyncio
 import json
 import math
@@ -36,6 +46,7 @@ from spectrum_scanner import ScannerEspectro
 from intelligence_scanner import ScannerInteligente
 from imsi_scanner import ScannerIMSI
 import hackrf_resource
+import tscm_scanner
 try:
     import llm_client
     _LLM_OK = True
@@ -710,13 +721,46 @@ async def ws_radio(ws: WebSocket,
             "bits": 16,
         }))
 
-        CHUNK_IQ = 400_000   # 100ms @ 2Msps (int8 I+Q = 200k pares)
+        import queue as _queue
+        CHUNK_RD = 131_072   # leitura crua do pipe (drena rápido)
+        TARGET   = 400_000   # ~100ms @ 2Msps para demodular de uma vez
+        _buf_q: "_queue.Queue" = _queue.Queue(maxsize=64)
+
+        def _reader():
+            # Thread dedicada: só lê o stdout do hackrf_transfer e enfileira.
+            # Mantém o pipe sempre drenado para o hackrf não travar (backpressure).
+            while True:
+                try:
+                    d = proc.stdout.read(CHUNK_RD)
+                except Exception:
+                    d = b""
+                if not d:
+                    try: _buf_q.put_nowait(None)
+                    except _queue.Full: pass
+                    break
+                try:
+                    _buf_q.put_nowait(d)
+                except _queue.Full:
+                    # consumidor lento — descarta o mais antigo p/ não travar o hackrf
+                    try: _buf_q.get_nowait()
+                    except _queue.Empty: pass
+                    try: _buf_q.put_nowait(d)
+                    except _queue.Full: pass
+
+        reader_t = threading.Thread(target=_reader, daemon=True, name="radio-reader")
+        reader_t.start()
 
         async def _ler_e_enviar():
+            acc = bytearray()
             while True:
-                data = await loop.run_in_executor(None, proc.stdout.read, CHUNK_IQ)
-                if not data or len(data) < 1000:
+                chunk = await loop.run_in_executor(None, _buf_q.get)
+                if chunk is None:
                     break
+                acc += chunk
+                if len(acc) < TARGET:
+                    continue
+                data = bytes(acc)
+                acc = bytearray()
                 # Demodulação multi-mode em thread separada (CPU)
                 pcm = await loop.run_in_executor(
                     None, _demodular, data, _mode, 2_000_000
@@ -786,6 +830,51 @@ async def radio_modo_por_categoria(cat: str = Query(...)):
                 "motivo": f"{cat} usa protocolo digital/criptografado — sem áudio"}
     modo, ar = _CAT_MODO.get(cat, ("NFM", 8_000))
     return {"audio": True, "modo": modo, "ar": ar}
+
+
+# ─── TSCM — Analista de Espectro (contra-vigilância) ──────────────────────────
+@app.get("/api/tscm/bandas")
+async def tscm_bandas():
+    """Lista os presets de banda disponíveis para varredura."""
+    return {k: {"label": v["label"]} for k, v in tscm_scanner.BANDAS.items()}
+
+
+@app.post("/api/tscm/scan")
+async def tscm_scan(body: dict):
+    """
+    Varre uma banda e devolve sinais classificados (escutas/câmeras).
+    Body: { "banda": "audio"|"cam24"|"cam1258"|"gsm"|"full", "amp": bool }
+    """
+    banda = (body.get("banda") or "audio").lower()
+    amp   = bool(body.get("amp", False))
+    lna   = int(body.get("lna", 32))
+    vga   = int(body.get("vga", 40))
+
+    # garante o HackRF livre p/ o sweep (pausa sensores, não retoma — página é dona)
+    sensor_hackrf.pausar()
+    sensor_espectro.pausar()
+    sensor_intel.pausar()
+
+    loop = asyncio.get_event_loop()
+    res = await loop.run_in_executor(
+        None, tscm_scanner.escanear, banda, lna, vga, amp
+    )
+    return res
+
+
+@app.post("/api/tscm/baseline")
+async def tscm_baseline(body: dict):
+    """Salva os sinais atuais como baseline da banda (p/ marcar NOVOS depois)."""
+    banda  = (body.get("banda") or "audio").lower()
+    sinais = body.get("sinais") or []
+    n = tscm_scanner.salvar_baseline(banda, sinais)
+    return {"ok": True, "banda": banda, "n": n}
+
+
+@app.delete("/api/tscm/baseline")
+async def tscm_baseline_limpar(banda: str = Query("audio")):
+    tscm_scanner.limpar_baseline(banda.lower())
+    return {"ok": True, "banda": banda}
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────
@@ -1697,7 +1786,7 @@ def _parar_tudo_hackrf():
     sensor_hackrf.pausar()
     sensor_espectro.pausar()
     sensor_intel.pausar()
-    subprocess.run(["pkill", "-9", "-f", "hackrf_transfer"], capture_output=True)
+    hackrf_resource.matar("hackrf_transfer", "hackrf_sweep")
 
 
 @app.post("/api/hackrf/start")
@@ -1725,8 +1814,8 @@ async def hackrf_start(body: dict):
     elif modo in ("imsi", "intercept"):
         sensor_imsi.iniciar_captura()
         iniciados = ["imsi/grgsm"]
-    elif modo in ("radio", "emergencia", "idle"):
-        # HackRF fica livre — a própria página assume (sintonizar / disparar)
+    elif modo in ("radio", "emergencia", "idle", "tscm", "analista"):
+        # HackRF fica livre — a própria página assume (varrer / sintonizar)
         iniciados = []
 
     return {"ok": True, "modo": modo, "iniciados": iniciados, "dono": hackrf_resource.dono()}

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SinalRF // ANALISTA DE ESPECTRO</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 16px 20px 60px; }
+
+    .hdr { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+           border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:14px; }
+    .hdr h1 { font-size:16px; letter-spacing:3px; color:var(--g); text-shadow:var(--glow-g); }
+    .hdr .sub { color:var(--g3); font-size:11px; }
+
+    .card { background:var(--bg2); border:1px solid var(--border); border-radius:6px;
+            padding:14px; margin-bottom:14px; }
+    .card h2 { font-size:11px; letter-spacing:2px; color:var(--g2); margin-bottom:10px;
+               text-transform:uppercase; }
+
+    .bands { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .band { padding:8px 12px; background:var(--bg3); border:1px solid var(--border);
+            border-radius:4px; color:var(--g2); cursor:pointer; font-family:var(--font);
+            font-size:11px; transition:all .12s; }
+    .band:hover { border-color:var(--border2); color:var(--g); }
+    .band.sel  { background:var(--g4); border-color:var(--g); color:var(--g); }
+
+    .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .btn { padding:9px 16px; border-radius:4px; border:1px solid var(--border2);
+           background:var(--g4); color:var(--g); cursor:pointer; font-family:var(--font);
+           font-size:12px; font-weight:600; letter-spacing:1px; transition:all .12s; }
+    .btn:hover:not(:disabled) { background:var(--g3); box-shadow:var(--glow-g); }
+    .btn:disabled { opacity:.4; cursor:not-allowed; }
+    .btn.sec { background:transparent; color:var(--g2); }
+    .btn.stop{ background:var(--r2); border-color:var(--r); color:var(--r); }
+
+    .toggle { display:flex; align-items:center; gap:6px; color:var(--g3); cursor:pointer; }
+    .toggle input { accent-color: var(--g); }
+
+    .st { font-size:11px; color:var(--g3); }
+    .st.ok  { color:var(--g); }  .st.busy{ color:var(--y); }  .st.err{ color:var(--r); }
+
+    canvas { display:block; width:100%; background:var(--bg); border:1px solid var(--border);
+             border-radius:4px; }
+
+    table { width:100%; border-collapse:collapse; font-size:11px; }
+    th { text-align:left; color:var(--g3); font-weight:500; padding:6px 8px;
+         border-bottom:1px solid var(--border2); letter-spacing:1px; }
+    td { padding:7px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    tr:hover td { background:var(--bg3); }
+
+    .freq { font-size:13px; font-weight:700; color:var(--g); }
+    .badge { display:inline-block; padding:2px 7px; border-radius:3px; font-size:10px;
+             font-weight:700; letter-spacing:.5px; white-space:nowrap; }
+    .s0 { background:var(--g4); color:var(--g2); }
+    .s1 { background:var(--b2); color:#fff; }
+    .s2 { background:var(--y2); color:#000; }
+    .s3 { background:var(--r);  color:#fff; }
+    .novo { background:var(--p2); color:#fff; margin-left:5px; }
+    .cat  { color:var(--g2); font-size:10px; }
+    .desc { color:var(--g3); }
+
+    .listen { display:none; }
+    .listen.on { display:block; }
+    .meter { height:14px; background:var(--bg); border:1px solid var(--border); border-radius:3px;
+             overflow:hidden; flex:1; min-width:120px; }
+    .meter > div { height:100%; width:0%; background:linear-gradient(90deg,var(--g),var(--y),var(--r));
+                   transition:width .08s; }
+    .modes { display:flex; gap:6px; }
+    .mode  { padding:5px 11px; border:1px solid var(--border); border-radius:4px; cursor:pointer;
+             color:var(--g3); font-size:11px; }
+    .mode.sel { background:var(--g4); border-color:var(--g); color:var(--g); }
+
+    .empty { color:var(--g3); text-align:center; padding:24px; font-size:11px; }
+    .legend { color:var(--g3); font-size:10px; margin-top:8px; line-height:1.7; }
+    .legend b { color:var(--g2); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>🕵️ ANALISTA DE ESPECTRO</h1>
+      <span class="sub">TSCM · caça a escutas e câmeras escondidas · entra na transmissão para identificar</span>
+    </div>
+
+    <!-- Controles -->
+    <div class="card">
+      <h2>1 · Escolha a banda e varra</h2>
+      <div class="bands" id="bands"></div>
+      <div class="row">
+        <button class="btn" id="scanBtn" onclick="varrer()">⟳ VARRER</button>
+        <label class="toggle" title="Liga o amplificador (mais sensível, mas pode saturar perto de FM forte)">
+          <input type="checkbox" id="ampChk"> amplificador (sensível)
+        </label>
+        <button class="btn sec" id="baseBtn" onclick="salvarBaseline()" title="Marca os sinais atuais como 'ambiente normal'. Na próxima varredura, sinais novos são destacados.">★ salvar baseline</button>
+        <button class="btn sec" id="baseClr" onclick="limparBaseline()">limpar baseline</button>
+        <span class="st" id="scanSt">Pronto.</span>
+      </div>
+    </div>
+
+    <!-- Panorama -->
+    <div class="card">
+      <h2>Panorama do sweep</h2>
+      <canvas id="pano" height="150"></canvas>
+      <div class="legend">
+        Marcas: <b style="color:var(--r)">vermelho</b> = suspeito (provável escuta/câmera) ·
+        <b style="color:var(--y)">amarelo</b> = atenção ·
+        <b style="color:var(--b)">azul</b> = conhecido/serviço ·
+        <b style="color:var(--g2)">verde</b> = broadcast normal
+      </div>
+    </div>
+
+    <!-- Escuta -->
+    <div class="card listen" id="listenCard">
+      <h2>🎧 Escutando transmissão</h2>
+      <div class="row" style="margin-bottom:10px">
+        <span class="freq" id="lFreq">— MHz</span>
+        <div class="modes" id="lModes">
+          <span class="mode" data-m="WFM" onclick="setMode('WFM')">WFM</span>
+          <span class="mode" data-m="NFM" onclick="setMode('NFM')">NFM</span>
+          <span class="mode" data-m="AM"  onclick="setMode('AM')">AM</span>
+        </div>
+        <div class="meter"><div id="lMeter"></div></div>
+        <span class="st" id="lDb">— dB</span>
+        <button class="btn stop" onclick="pararEscuta()">■ PARAR</button>
+      </div>
+      <canvas id="wave" height="90"></canvas>
+      <div class="legend" id="lSt"></div>
+    </div>
+
+    <!-- Resultados -->
+    <div class="card">
+      <h2>2 · Sinais detectados <span class="st" id="nSig"></span></h2>
+      <div id="results">
+        <div class="empty">Nenhuma varredura ainda. Escolha uma banda e clique em VARRER.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    const WS = `ws://${location.host}`;
+    let bandaSel = 'audio';
+    let ultimoSinais = [];
+
+    // ── Bandas ────────────────────────────────────────────────────────────────
+    const BANDAS_FALLBACK = {
+      audio:  { label:'Escutas áudio (VHF/UHF)' },
+      cam24:  { label:'Câmeras 2.4 GHz' },
+      cam1258:{ label:'Câmeras 1.2 / 5.8 GHz' },
+      gsm:    { label:'GSM/Celular' },
+      full:   { label:'Completa (80M–6G)' },
+    };
+    async function carregarBandas() {
+      let bandas = BANDAS_FALLBACK;
+      try { const r = await fetch('/api/tscm/bandas'); if (r.ok) bandas = await r.json(); } catch {}
+      const div = document.getElementById('bands');
+      div.innerHTML = '';
+      Object.entries(bandas).forEach(([k, v]) => {
+        const b = document.createElement('div');
+        b.className = 'band' + (k === bandaSel ? ' sel' : '');
+        b.textContent = v.label;
+        b.onclick = () => { bandaSel = k; document.querySelectorAll('.band').forEach(e => e.classList.remove('sel')); b.classList.add('sel'); };
+        div.appendChild(b);
+      });
+    }
+
+    // ── Varredura ─────────────────────────────────────────────────────────────
+    async function varrer() {
+      const btn = document.getElementById('scanBtn');
+      btn.disabled = true;
+      setSt('scanSt', 'Varrendo ' + bandaSel + '… (pode levar até 1 min)', 'busy');
+      try {
+        const r = await fetch('/api/tscm/scan', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ banda: bandaSel, amp: document.getElementById('ampChk').checked })
+        });
+        const d = await r.json();
+        if (!d.ok) { setSt('scanSt', '⚠ ' + (d.erro || 'falha'), 'err'); return; }
+        ultimoSinais = d.sinais || [];
+        render(d);
+        const nNov = ultimoSinais.filter(s => s.novo).length;
+        setSt('scanSt', `✓ ${d.n_sinais} sinais · piso ${d.piso_db} dBm` + (d.tem_baseline ? ` · ${nNov} NOVOS` : ''), 'ok');
+      } catch (e) {
+        setSt('scanSt', '⚠ erro: ' + e.message, 'err');
+      } finally { btn.disabled = false; }
+    }
+
+    function render(d) {
+      desenharPano(d.panorama, d.sinais);
+      document.getElementById('nSig').textContent = `(${d.n_sinais})`;
+      const box = document.getElementById('results');
+      if (!d.sinais.length) { box.innerHTML = '<div class="empty">Nenhum sinal acima do ruído nesta banda.</div>'; return; }
+      let html = `<table><thead><tr>
+        <th>nível</th><th>freq</th><th>pot.</th><th>largura</th><th>tipo</th><th>análise</th><th>ação</th>
+      </tr></thead><tbody>`;
+      d.sinais.forEach(s => {
+        const nov = s.novo ? '<span class="badge novo">NOVO</span>' : '';
+        const lbl = ['ok','info','atenção','SUSPEITO'][s.suspeita] || '?';
+        const acao = s.modo
+          ? `<button class="btn" style="padding:4px 10px" onclick="ouvir(${s.freq_mhz}, '${s.modo}')">▶ ouvir</button>`
+          : `<span class="st">sem áudio</span>`;
+        html += `<tr>
+          <td><span class="badge s${s.suspeita}">${lbl}</span>${nov}</td>
+          <td class="freq">${fmtFreq(s.freq_mhz)}</td>
+          <td>${s.dbm} dBm</td>
+          <td>${fmtBw(s.bw_khz)}</td>
+          <td class="cat">${s.cat}</td>
+          <td class="desc">${s.desc}</td>
+          <td>${acao}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      box.innerHTML = html;
+    }
+
+    function fmtFreq(mhz) { return mhz >= 1000 ? (mhz/1000).toFixed(4)+' GHz' : mhz.toFixed(3)+' MHz'; }
+    function fmtBw(khz)   { return khz >= 1000 ? (khz/1000).toFixed(2)+' MHz' : khz.toFixed(0)+' kHz'; }
+    function setSt(id, t, cls) { const e=document.getElementById(id); e.textContent=t; e.className='st '+(cls||''); }
+
+    // ── Panorama canvas ───────────────────────────────────────────────────────
+    function desenharPano(pano, sinais) {
+      const cv = document.getElementById('pano');
+      cv.width = cv.clientWidth;
+      const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+      ctx.clearRect(0,0,W,H);
+      if (!pano || !pano.freqs || !pano.freqs.length) return;
+      const fs = pano.freqs, ds = pano.dbm;
+      const fMin = fs[0], fMax = fs[fs.length-1];
+      const dMin = Math.min(...ds) - 3, dMax = Math.max(...ds) + 3;
+      const x = f => (f - fMin) / (fMax - fMin || 1) * W;
+      const y = d => H - (d - dMin) / (dMax - dMin || 1) * H;
+      // linha de espectro
+      ctx.strokeStyle = 'rgba(71,223,127,.55)'; ctx.lineWidth = 1; ctx.beginPath();
+      fs.forEach((f,i) => { const px=x(f), py=y(ds[i]); i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
+      ctx.stroke();
+      // marcas dos sinais
+      const cores = ['#2eb861','#4FAFFF','#F5D800','#FF3B30'];
+      (sinais||[]).forEach(s => {
+        const px = x(s.freq_mhz);
+        ctx.strokeStyle = cores[s.suspeita] || '#888'; ctx.lineWidth = s.suspeita>=2?2:1;
+        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+      });
+    }
+
+    // ── Escuta (reutiliza /ws/radio) ──────────────────────────────────────────
+    let _ctx=null, _ws=null, _nextAt=0, _on=false, _freq=0, _mode='WFM', _sr=48000;
+    let _hist=new Float32Array(480);
+
+    function ouvir(freq, modo) {
+      pararEscuta();
+      _freq = freq; _mode = modo || 'WFM';
+      document.getElementById('listenCard').classList.add('on');
+      document.getElementById('lFreq').textContent = fmtFreq(freq);
+      marcarModo();
+      conectar();
+    }
+    function setMode(m) { if (!_on && _freq===0) return; _mode=m; marcarModo(); if (_freq) { conectar(); } }
+    function marcarModo() {
+      document.querySelectorAll('#lModes .mode').forEach(e =>
+        e.classList.toggle('sel', e.dataset.m === _mode));
+    }
+
+    function conectar() {
+      if (_ws) { try{_ws.send('STOP');_ws.close();}catch{} _ws=null; }
+      if (_ctx) { _ctx.close().catch(()=>{}); _ctx=null; }
+      _ctx = new AudioContext();
+      _nextAt = _ctx.currentTime + 0.15;
+      _ws = new WebSocket(`${WS}/ws/radio?freq=${_freq}&mode=${_mode}`);
+      _ws.binaryType = 'arraybuffer';
+      document.getElementById('lSt').textContent = 'conectando…';
+      _ws.onmessage = (ev) => {
+        if (typeof ev.data === 'string') {
+          const m = JSON.parse(ev.data);
+          if (m.erro) { document.getElementById('lSt').textContent='⚠ '+m.erro; pararEscuta(); return; }
+          _sr = m.sample_rate || 48000;
+          document.getElementById('lSt').textContent = `▶ ${fmtFreq(_freq)} · ${m.mode} · ${_sr/1000}kHz/16bit — se não identificar, troque o modo (WFM/NFM/AM)`;
+          return;
+        }
+        const pcm = new Int16Array(ev.data);
+        const f32 = new Float32Array(pcm.length); let mx=0;
+        for (let i=0;i<pcm.length;i++){ f32[i]=pcm[i]/32768; const a=Math.abs(f32[i]); if(a>mx)mx=a; }
+        // histórico p/ onda
+        const step=Math.max(1,Math.floor(f32.length/16));
+        const nv=[]; for(let i=0;i<f32.length;i+=step)nv.push(f32[i]);
+        _hist=new Float32Array([..._hist,...nv].slice(-480));
+        // medidor
+        const db = mx>0 ? Math.max(-60,20*Math.log10(mx)) : -60;
+        document.getElementById('lMeter').style.width = ((db+60)/60*100).toFixed(1)+'%';
+        document.getElementById('lDb').textContent = db.toFixed(0)+' dB';
+        // áudio (usa o sample_rate reportado pelo servidor)
+        const buf=_ctx.createBuffer(1,f32.length,_sr);
+        buf.getChannelData(0).set(f32);
+        const src=_ctx.createBufferSource(); src.buffer=buf; src.connect(_ctx.destination);
+        const now=_ctx.currentTime; if(_nextAt<now)_nextAt=now+0.05;
+        src.start(_nextAt); _nextAt+=buf.duration;
+      };
+      _ws.onclose = () => { if(_on) document.getElementById('lSt').textContent='conexão encerrada'; };
+      _ws.onerror = () => { document.getElementById('lSt').textContent='⚠ erro de conexão'; };
+      _on = true;
+      requestAnimationFrame(desenharOnda);
+    }
+
+    function pararEscuta() {
+      _on=false;
+      if(_ws){ try{_ws.send('STOP');_ws.close();}catch{} _ws=null; }
+      if(_ctx){ _ctx.close().catch(()=>{}); _ctx=null; }
+      document.getElementById('lMeter').style.width='0%';
+      document.getElementById('lDb').textContent='— dB';
+    }
+
+    function desenharOnda() {
+      if(!_on) return;
+      const cv=document.getElementById('wave'); cv.width=cv.clientWidth;
+      const ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle='var(--g)'; ctx.strokeStyle='#47DF7F'; ctx.lineWidth=1; ctx.beginPath();
+      for(let i=0;i<_hist.length;i++){ const x=i/_hist.length*W, y=H/2-_hist[i]*H*0.45; i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+      ctx.stroke();
+      requestAnimationFrame(desenharOnda);
+    }
+
+    // ── Baseline ──────────────────────────────────────────────────────────────
+    async function salvarBaseline() {
+      if (!ultimoSinais.length) { setSt('scanSt','varra primeiro para salvar baseline','busy'); return; }
+      await fetch('/api/tscm/baseline', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ banda: bandaSel, sinais: ultimoSinais }) });
+      setSt('scanSt', `★ baseline salvo (${ultimoSinais.length} sinais) — agora varra de novo p/ ver NOVOS`, 'ok');
+    }
+    async function limparBaseline() {
+      await fetch('/api/tscm/baseline?banda='+bandaSel, { method:'DELETE' });
+      setSt('scanSt','baseline limpo','');
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    carregarBandas();
+    // assume controle do HackRF para esta página (pausa sensores)
+    fetch('/api/hackrf/start', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ modo:'tscm' }) }).catch(()=>{});
+    window.addEventListener('beforeunload', pararEscuta);
+  </script>
+</body>
+</html>
