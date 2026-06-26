@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SinalRF // CÂMERAS IP</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 16px 20px 60px; }
+    .hdr { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+           border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:14px; }
+    .hdr h1 { font-size:16px; letter-spacing:3px; color:var(--g); text-shadow:var(--glow-g); }
+    .hdr .sub { color:var(--g3); font-size:11px; }
+    .card { background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:14px; margin-bottom:14px; }
+    .card h2 { font-size:11px; letter-spacing:2px; color:var(--g2); margin-bottom:10px; text-transform:uppercase; }
+    .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .btn { padding:9px 16px; border-radius:4px; border:1px solid var(--border2); background:var(--g4);
+           color:var(--g); cursor:pointer; font-family:var(--font); font-size:12px; font-weight:600; letter-spacing:1px; }
+    .btn:hover:not(:disabled) { background:var(--g3); box-shadow:var(--glow-g); }
+    .btn:disabled { opacity:.4; cursor:not-allowed; }
+    .info { display:flex; gap:24px; flex-wrap:wrap; font-size:12px; }
+    .info b { color:var(--g); } .info span { color:var(--g3); }
+    .st { font-size:11px; color:var(--g3); }
+    .st.ok{color:var(--g)} .st.busy{color:var(--y)} .st.err{color:var(--r)}
+    table { width:100%; border-collapse:collapse; font-size:11px; }
+    th { text-align:left; color:var(--g3); font-weight:500; padding:6px 8px; border-bottom:1px solid var(--border2); letter-spacing:1px; }
+    td { padding:7px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    tr:hover td { background:var(--bg3); }
+    tr.cam td { background:rgba(255,59,48,.06); }
+    .ip { font-size:13px; font-weight:700; color:var(--g); }
+    .mac { color:var(--g3); font-family:var(--font); }
+    .badge { display:inline-block; padding:2px 7px; border-radius:3px; font-size:10px; font-weight:700; white-space:nowrap; }
+    .c3 { background:var(--r); color:#fff; }
+    .c2 { background:var(--y2); color:#000; }
+    .c1 { background:var(--b2); color:#fff; }
+    .c0 { background:var(--g4); color:var(--g2); }
+    .port { display:inline-block; padding:1px 5px; margin:1px; border:1px solid var(--border); border-radius:3px; font-size:10px; color:var(--g2); }
+    .port.rtsp { border-color:var(--r); color:var(--r); }
+    a.open { color:var(--b); text-decoration:none; } a.open:hover { text-decoration:underline; }
+    .empty { color:var(--g3); text-align:center; padding:24px; font-size:11px; }
+    .legend { color:var(--g3); font-size:10px; margin-top:8px; line-height:1.6; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>📷 CÂMERAS IP / WiFi</h1>
+      <span class="sub">escaneia a SUA rede e lista dispositivos · destaca câmeras (IP, MAC, fabricante, portas RTSP/ONVIF)</span>
+    </div>
+
+    <div class="card">
+      <h2>Rede atual</h2>
+      <div class="row" style="margin-bottom:12px">
+        <div class="info" id="netInfo"><span>carregando…</span></div>
+      </div>
+      <div class="row">
+        <button class="btn" id="scanBtn" onclick="scan()">⟳ ESCANEAR REDE</button>
+        <span class="st" id="st">Pronto.</span>
+      </div>
+      <div class="legend">
+        ⚠ Só encontra câmeras na <b>mesma rede que este PC</b> — é o único jeito de obter o IP.
+        Câmeras em redes de terceiros (vizinho) são criptografadas e não expõem IP.
+        Confiança: <b style="color:var(--r)">vermelho</b> = câmera (RTSP/fabricante) ·
+        <b style="color:var(--y)">amarelo</b> = provável · <b style="color:var(--b)">azul</b> = porta web (pode ser câmera).
+      </div>
+    </div>
+
+    <div class="card" id="camCard" style="display:none">
+      <h2>🎯 Câmeras encontradas <span class="st" id="nCam"></span></h2>
+      <div id="cams"></div>
+    </div>
+
+    <div class="card">
+      <h2>Todos os dispositivos <span class="st" id="nDev"></span></h2>
+      <div id="devs"><div class="empty">Clique em ESCANEAR REDE para listar os dispositivos.</div></div>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    async function carregarInfo() {
+      try {
+        const r = await fetch('/api/rede/info'); const d = await r.json();
+        document.getElementById('netInfo').innerHTML =
+          `<div><b>${d.ssid || '(rede)'}</b> <span>SSID</span></div>` +
+          `<div><b>${d.ip_local}</b> <span>seu IP</span></div>` +
+          `<div><b>${d.subnet}</b> <span>sub-rede</span></div>`;
+      } catch {}
+    }
+
+    function setSt(t, c) { const e=document.getElementById('st'); e.textContent=t; e.className='st '+(c||''); }
+
+    async function scan() {
+      const btn = document.getElementById('scanBtn'); btn.disabled = true;
+      setSt('escaneando a rede… (ping sweep + portas, ~10-40s)', 'busy');
+      try {
+        const r = await fetch('/api/rede/scan', { method:'POST' });
+        const d = await r.json();
+        if (!d.ok) { setSt('⚠ ' + (d.erro || 'falha'), 'err'); return; }
+        render(d);
+        setSt(`✓ ${d.n_dispositivos} dispositivos · ${d.n_cameras} câmera(s)`, 'ok');
+      } catch (e) { setSt('⚠ erro: ' + e.message, 'err'); }
+      finally { btn.disabled = false; }
+    }
+
+    function linhaDispositivo(d) {
+      const conf = ['—','possível','provável','CÂMERA'][d.conf] || '—';
+      const portas = (d.portas||[]).map(p =>
+        `<span class="port${[554,8554,10554].includes(p)?' rtsp':''}">${p}</span>`).join('');
+      const link = d.url ? `<a class="open" href="${d.url}" target="_blank">abrir ▸</a>` : '';
+      return `<tr class="${d.camera?'cam':''}">
+        <td><span class="badge c${d.conf}">${conf}</span></td>
+        <td class="ip">${d.ip}</td>
+        <td class="mac">${d.mac || '—'}</td>
+        <td>${d.vendor || '—'}</td>
+        <td>${d.hostname || '—'}</td>
+        <td>${portas || '—'}</td>
+        <td>${d.motivo || ''} ${link}</td>
+      </tr>`;
+    }
+
+    function tabela(lista) {
+      let h = `<table><thead><tr>
+        <th>tipo</th><th>IP</th><th>MAC</th><th>fabricante</th><th>hostname</th><th>portas</th><th>obs</th>
+      </tr></thead><tbody>`;
+      h += lista.map(linhaDispositivo).join('');
+      return h + '</tbody></table>';
+    }
+
+    function render(d) {
+      document.getElementById('nDev').textContent = `(${d.n_dispositivos})`;
+      document.getElementById('devs').innerHTML = d.dispositivos.length ? tabela(d.dispositivos)
+        : '<div class="empty">Nenhum dispositivo respondeu.</div>';
+      const cams = d.dispositivos.filter(x => x.camera);
+      const cc = document.getElementById('camCard');
+      if (cams.length) {
+        cc.style.display = '';
+        document.getElementById('nCam').textContent = `(${cams.length})`;
+        document.getElementById('cams').innerHTML = tabela(cams);
+      } else {
+        cc.style.display = 'none';
+      }
+    }
+
+    carregarInfo();
+  </script>
+</body>
+</html>

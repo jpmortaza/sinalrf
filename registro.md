@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-06-26 · Câmeras IP/WiFi — scanner de rede
+
+**Pedido do Jean:** para câmeras WiFi, quero o IP e a rede em que estão conectadas.
+
+**Decisão técnica:** o HackRF NÃO obtém IP de câmera WiFi (tráfego 802.11 criptografado;
+o IP fica nos dados cifrados). O IP só se consegue escaneando a rede em que o PC está.
+Por isso a feature é um scanner de rede (não-RF), focado na rede do próprio PC. Câmeras em
+redes de terceiros exigiriam adaptador em modo monitor e mesmo assim só dariam MAC↔SSID.
+
+**Implementação:**
+- `net_scanner.py` — info da rede (IP/SSID/sub-rede via netsh+socket), ping sweep concorrente
+  + tabela ARP (filtra broadcast/multicast), varredura de portas de câmera (RTSP 554/8554,
+  ONVIF 80/8000/8080, DVR 37777/34567…), hostname por DNS reverso, fabricante por OUI
+  (lista curada de Hikvision/Dahua/Reolink/Wyze/Ring/Tuya-Espressif/etc.), classificação de
+  câmera por porta RTSP + fabricante
+- `server.py` — endpoints `GET /api/rede/info`, `POST /api/rede/scan`
+- `ui/rede.html` — página "CÂMERAS IP": info da rede, botão escanear, card de câmeras
+  destacadas + tabela de todos os dispositivos (IP, MAC, fabricante, hostname, portas, link abrir)
+- `ui/nav.js` — aba CÂMERAS IP (modo idle, não usa HackRF)
+
+**Causa raiz de fix:** sob o servidor (sem console), `subprocess.run(ping, text=True).stdout`
+vinha `None`/erro de locale → adicionado `errors="ignore"` e guardas `or ""`.
+
+**Verificado:** escaneou a rede real (192.168.1.0/24) — 7 dispositivos com IP/MAC/hostname/
+portas corretos, broadcast filtrado. (Sem câmeras IP nesta rede.)
+
+**Pendências:** OUI é lista curada (fabricantes não-listados aparecem sem nome); detecção
+forte vem das portas. Câmeras em outras redes (modo monitor) fora de escopo.
+
 ## 2026-06-26 · Suporte a Windows + Analista de Espectro (TSCM)
 
 **Pedido do Jean:** instalar e rodar no Windows (Mac→Windows), e criar uma página de

@@ -20,6 +20,7 @@ em HTML/JS puro, com streaming de dados via WebSocket a 10 Hz.
 - **Rádio FM** (WFM/NFM/AM) com nomes de estações brasileiras
 - **Scanner de espectro** 88–6000 MHz com categorização (FM, celular, WiFi, 5G…) e histórico waterfall
 - **Analista de Espectro (TSCM)** — varre faixas de escutas/câmeras (VHF/UHF, 1.2/2.4/5.8 GHz, GSM), classifica cada sinal (provável escuta, câmera, WiFi, celular), **entra na transmissão de áudio** para identificar e tenta **decodificar a imagem de câmeras analógicas FM** (NTSC/PAL, monocromático, experimental); baseline p/ destacar sinais novos
+- **Câmeras IP/WiFi (rede)** — escaneia a rede do PC e lista todos os dispositivos com **IP, MAC, fabricante e portas** (RTSP/ONVIF), destacando as câmeras. Não usa HackRF — é o único jeito de obter o IP de câmeras WiFi (o tráfego RF é criptografado)
 - **Ambiente RF 3D** — canvas 2D com projeção em perspectiva (pilares, esferas, partículas)
 - **Doppler WiFi passivo** + análise por LLM local
 - **Interceptação GSM/IMSI** via gr-gsm (auto-scan das torres mais fortes)
@@ -138,6 +139,7 @@ Com o servidor no ar, acesse: **http://localhost:8765**
 | `/radio.html` | Rádio FM |
 | `/scanner.html` | Scanner de espectro / inteligência |
 | `/analista.html` | **Analista de Espectro (TSCM)** — varre escutas/câmeras e escuta a transmissão |
+| `/rede.html` | **Câmeras IP/WiFi** — escaneia a rede e lista dispositivos/câmeras (IP, MAC, fabricante, portas) |
 | `/3d.html` | Ambiente RF 3D |
 | `/health.html` | Monitor de saúde RF |
 | `/doppler.html` | Doppler WiFi + IA |

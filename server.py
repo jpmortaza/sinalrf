@@ -48,6 +48,7 @@ from imsi_scanner import ScannerIMSI
 import hackrf_resource
 import tscm_scanner
 import tscm_video
+import net_scanner
 try:
     import llm_client
     _LLM_OK = True
@@ -900,6 +901,20 @@ async def tscm_video_decode(body: dict):
         None, lambda: tscm_video.analisar(freq, padrao, sr, 0.20, 24, 32, amp)
     )
     return res
+
+
+# ─── Rede — Câmeras WiFi/IP (não usa HackRF) ──────────────────────────────────
+@app.get("/api/rede/info")
+async def rede_info():
+    """Info da rede atual do PC (IP, SSID, sub-rede)."""
+    return net_scanner.info_rede()
+
+
+@app.post("/api/rede/scan")
+async def rede_scan():
+    """Escaneia a rede local e lista dispositivos, destacando câmeras IP/WiFi."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, net_scanner.escanear)
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────
