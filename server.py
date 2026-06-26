@@ -47,6 +47,7 @@ from intelligence_scanner import ScannerInteligente
 from imsi_scanner import ScannerIMSI
 import hackrf_resource
 import tscm_scanner
+import tscm_video
 try:
     import llm_client
     _LLM_OK = True
@@ -875,6 +876,30 @@ async def tscm_baseline(body: dict):
 async def tscm_baseline_limpar(banda: str = Query("audio")):
     tscm_scanner.limpar_baseline(banda.lower())
     return {"ok": True, "banda": banda}
+
+
+@app.post("/api/tscm/video")
+async def tscm_video_decode(body: dict):
+    """
+    Tenta decodificar vídeo analógico (câmera FM) na frequência dada.
+    Body: { "freq": <MHz>, "padrao": "auto"|"NTSC"|"PAL", "sr": <Hz opc>, "amp": bool }
+    Retorna um frame em tons de cinza (gray_b64 = bytes WxH base64) ou motivo da falha.
+    """
+    freq   = float(body.get("freq", 0))
+    padrao = (body.get("padrao") or "auto")
+    sr     = int(body.get("sr", 16_000_000))
+    amp    = bool(body.get("amp", False))
+    if freq <= 0:
+        return {"ok": False, "motivo": "frequência inválida"}
+
+    # garante HackRF livre (página é dona no modo tscm)
+    sensor_hackrf.pausar(); sensor_espectro.pausar(); sensor_intel.pausar()
+
+    loop = asyncio.get_event_loop()
+    res = await loop.run_in_executor(
+        None, lambda: tscm_video.analisar(freq, padrao, sr, 0.20, 24, 32, amp)
+    )
+    return res
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────

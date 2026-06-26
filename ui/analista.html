@@ -128,6 +128,27 @@
       <div class="legend" id="lSt"></div>
     </div>
 
+    <!-- Vídeo (Fase 2 — câmeras analógicas) -->
+    <div class="card listen" id="videoCard">
+      <h2>📹 Inspeção de vídeo (câmera analógica)</h2>
+      <div class="row" style="margin-bottom:10px">
+        <span class="freq" id="vFreq">— MHz</span>
+        <div class="modes" id="vPad">
+          <span class="mode sel" data-p="auto" onclick="setPad('auto')">auto</span>
+          <span class="mode" data-p="NTSC" onclick="setPad('NTSC')">NTSC</span>
+          <span class="mode" data-p="PAL"  onclick="setPad('PAL')">PAL</span>
+        </div>
+        <button class="btn" id="vReBtn" onclick="recapturarVideo()">⟳ recapturar</button>
+        <button class="btn stop" onclick="fecharVideo()">✕ fechar</button>
+        <span class="st" id="vSt"></span>
+      </div>
+      <canvas id="vid" height="288" style="image-rendering:pixelated; max-width:480px; margin:0 auto"></canvas>
+      <div class="legend">
+        ⚠ Experimental: só decodifica câmeras <b>analógicas FM</b> (1.2/2.4/5.8 GHz).
+        Câmeras digitais/WiFi são criptografadas — aparecem como ruído. Sem câmera analógica ativa, não há imagem.
+      </div>
+    </div>
+
     <!-- Resultados -->
     <div class="card">
       <h2>2 · Sinais detectados <span class="st" id="nSig"></span></h2>
@@ -197,9 +218,13 @@
       d.sinais.forEach(s => {
         const nov = s.novo ? '<span class="badge novo">NOVO</span>' : '';
         const lbl = ['ok','info','atenção','SUSPEITO'][s.suspeita] || '?';
-        const acao = s.modo
-          ? `<button class="btn" style="padding:4px 10px" onclick="ouvir(${s.freq_mhz}, '${s.modo}')">▶ ouvir</button>`
-          : `<span class="st">sem áudio</span>`;
+        let acao;
+        if (s.modo)
+          acao = `<button class="btn" style="padding:4px 10px" onclick="ouvir(${s.freq_mhz}, '${s.modo}')">▶ ouvir</button>`;
+        else if (ehCamera(s.freq_mhz))
+          acao = `<button class="btn" style="padding:4px 10px" onclick="inspecionarVideo(${s.freq_mhz})">📹 vídeo</button>`;
+        else
+          acao = `<span class="st">sem áudio</span>`;
         html += `<tr>
           <td><span class="badge s${s.suspeita}">${lbl}</span>${nov}</td>
           <td class="freq">${fmtFreq(s.freq_mhz)}</td>
@@ -318,6 +343,51 @@
       for(let i=0;i<_hist.length;i++){ const x=i/_hist.length*W, y=H/2-_hist[i]*H*0.45; i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
       ctx.stroke();
       requestAnimationFrame(desenharOnda);
+    }
+
+    // ── Vídeo (Fase 2 — câmeras analógicas) ─────────────────────────────────────
+    let _vFreq = 0, _vPad = 'auto';
+    function ehCamera(f) {
+      return (f>=1100 && f<=1300) || (f>=2400 && f<=2500) || (f>=5650 && f<=5950);
+    }
+    function setPad(p) {
+      _vPad = p;
+      document.querySelectorAll('#vPad .mode').forEach(e => e.classList.toggle('sel', e.dataset.p===p));
+      if (_vFreq) recapturarVideo();
+    }
+    function fecharVideo() { document.getElementById('videoCard').classList.remove('on'); _vFreq=0; }
+    function inspecionarVideo(freq) {
+      _vFreq = freq;
+      document.getElementById('videoCard').classList.add('on');
+      document.getElementById('vFreq').textContent = fmtFreq(freq);
+      document.getElementById('videoCard').scrollIntoView({behavior:'smooth', block:'center'});
+      recapturarVideo();
+    }
+    async function recapturarVideo() {
+      if (!_vFreq) return;
+      const btn = document.getElementById('vReBtn'); btn.disabled = true;
+      setSt('vSt', 'capturando banda larga e decodificando…', 'busy');
+      try {
+        const r = await fetch('/api/tscm/video', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ freq:_vFreq, padrao:_vPad, amp: document.getElementById('ampChk').checked }) });
+        const d = await r.json();
+        if (!d.ok) { setSt('vSt', '✕ ' + (d.motivo || 'sem vídeo') + (d.qualidade!=null?` (sync ${(d.qualidade*100).toFixed(0)}%)`:''), 'err'); limpaVideo(); return; }
+        desenharVideo(d);
+        setSt('vSt', `✓ ${d.padrao} · ${d.w}×${d.h} · sync ${(d.qualidade*100).toFixed(0)}% · ${d.linhas} linhas`, 'ok');
+      } catch (e) { setSt('vSt', '✕ erro: ' + e.message, 'err'); }
+      finally { btn.disabled = false; }
+    }
+    function limpaVideo() {
+      const cv=document.getElementById('vid'); const ctx=cv.getContext('2d');
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,cv.width,cv.height);
+    }
+    function desenharVideo(d) {
+      const bin = atob(d.gray_b64);
+      const cv = document.getElementById('vid'); cv.width = d.w; cv.height = d.h;
+      const ctx = cv.getContext('2d');
+      const img = ctx.createImageData(d.w, d.h);
+      for (let i=0;i<d.w*d.h;i++){ const g=bin.charCodeAt(i); img.data[i*4]=g; img.data[i*4+1]=g; img.data[i*4+2]=g; img.data[i*4+3]=255; }
+      ctx.putImageData(img, 0, 0);
     }
 
     // ── Baseline ──────────────────────────────────────────────────────────────

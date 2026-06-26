@@ -19,7 +19,7 @@ em HTML/JS puro, com streaming de dados via WebSocket a 10 Hz.
 - **Dashboard em tempo real** — WiFi RSSI, Doppler corporal, presença, respiração e batimentos
 - **Rádio FM** (WFM/NFM/AM) com nomes de estações brasileiras
 - **Scanner de espectro** 88–6000 MHz com categorização (FM, celular, WiFi, 5G…) e histórico waterfall
-- **Analista de Espectro (TSCM)** — varre faixas de escutas/câmeras (VHF/UHF, 1.2/2.4/5.8 GHz, GSM), classifica cada sinal (provável escuta, câmera, WiFi, celular) e **entra na transmissão de áudio** para identificar; baseline p/ destacar sinais novos
+- **Analista de Espectro (TSCM)** — varre faixas de escutas/câmeras (VHF/UHF, 1.2/2.4/5.8 GHz, GSM), classifica cada sinal (provável escuta, câmera, WiFi, celular), **entra na transmissão de áudio** para identificar e tenta **decodificar a imagem de câmeras analógicas FM** (NTSC/PAL, monocromático, experimental); baseline p/ destacar sinais novos
 - **Ambiente RF 3D** — canvas 2D com projeção em perspectiva (pilares, esferas, partículas)
 - **Doppler WiFi passivo** + análise por LLM local
 - **Interceptação GSM/IMSI** via gr-gsm (auto-scan das torres mais fortes)

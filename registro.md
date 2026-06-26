@@ -28,7 +28,20 @@ entrar na transmissão (áudio) para identificar o sinal. Fase 1: detectar+class
 
 **Verificado com HackRF real:** `hackrf_info`/`hackrf_sweep`/`hackrf_transfer` OK; scan audio/cam24 detecta e classifica; escuta FM transmite PCM a 3.9 MB/s sem travar.
 
-**Pendências:** Fase 2 — decode de vídeo analógico (1.2/2.4/5.8 GHz) para visualizar imagem de câmera; IMSI segue indisponível no Windows (gr-gsm é Linux/Mac).
+**Fase 2 (decode de vídeo analógico) — IMPLEMENTADA:**
+- `tscm_video.py` — captura IQ de banda larga (16 Msps via hackrf_transfer -n), demod FM,
+  detecção de sync horizontal robusta a ruído (suavização + run-length por duração mínima),
+  fatiamento em linhas e reconstrução de frame em tons de cinza (NTSC/PAL, auto). Escolhe o
+  trecho de linhas mais bem espaçadas p/ evitar tearing.
+- `server.py` — endpoint `/api/tscm/video`
+- `ui/analista.html` — botão "📹 vídeo" nos sinais de câmera + painel com canvas, seletor
+  NTSC/PAL/auto e recapturar; render via ImageData
+- Validado com sinal NTSC sintético (reconstrói barras + gradiente nítidos); em RF real sem
+  câmera analógica retorna "sem sincronismo" graciosamente.
+
+**Pendências:** vídeo analógico é monocromático (sem decode de croma NTSC/PAL); câmeras
+digitais/WiFi (criptografadas) não são decodificáveis — só detectadas. IMSI segue
+indisponível no Windows (gr-gsm é Linux/Mac).
 
 ## 2026-06-12 · v3.0 — mtzHRF: renome, IA local, emergência, Doppler WiFi, template (commit dcfd462)
 
