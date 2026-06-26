@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SinalRF // WiFi Red Team</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap{max-width:1280px;margin:0 auto;padding:16px 20px 60px}
+    .hdr{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px}
+    .hdr h1{font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:var(--glow-g)}
+    .hdr .sub{color:var(--g3);font-size:11px}
+    .auth{background:rgba(245,216,0,.08);border:1px solid var(--y2);border-radius:6px;padding:10px 14px;margin-bottom:14px;color:var(--y);font-size:11px;line-height:1.6}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:14px}
+    .card h2{font-size:11px;letter-spacing:2px;color:var(--g2);margin-bottom:10px;text-transform:uppercase}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .btn{padding:9px 16px;border-radius:4px;border:1px solid var(--border2);background:var(--g4);color:var(--g);cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:1px}
+    .btn:hover:not(:disabled){background:var(--g3);box-shadow:var(--glow-g)}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    .btn.sec{background:transparent;color:var(--g2)}
+    .btn.stop{background:var(--r2);border-color:var(--r);color:var(--r)}
+    .st{font-size:11px;color:var(--g3)} .st.ok{color:var(--g)} .st.busy{color:var(--y)} .st.err{color:var(--r)}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{text-align:left;color:var(--g3);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border2);letter-spacing:1px}
+    td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+    tr:hover td{background:var(--bg3)} tr.rogue td{background:rgba(255,59,48,.07)}
+    input,select{background:var(--bg);border:1px solid var(--border2);color:var(--g);padding:8px;border-radius:4px;font-family:var(--font);font-size:12px}
+    .badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700}
+    .seg-ABERTA{background:var(--r);color:#fff}.seg-WEP{background:var(--o);color:#000}
+    .seg-WPA{background:var(--y2);color:#000}.seg-WPA2{background:var(--g4);color:var(--g2)}.seg-WPA3{background:var(--b2);color:#fff}
+    .bar{display:inline-block;height:8px;background:var(--g);border-radius:2px;vertical-align:middle}
+    .alert{background:rgba(255,59,48,.08);border:1px solid var(--r);border-radius:5px;padding:8px 12px;margin:5px 0;font-size:11px;color:var(--r)}
+    .legend{color:var(--g3);font-size:10px;margin-top:8px;line-height:1.6}
+    .pill{display:inline-flex;gap:8px;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:8px 12px;margin:4px 0;font-size:11px}
+    a.lnk{color:var(--b);text-decoration:none} a.lnk:hover{text-decoration:underline}
+    code{color:var(--c);background:var(--bg);padding:2px 6px;border-radius:3px}
+    .toggle{display:flex;align-items:center;gap:6px;color:var(--g2);cursor:pointer} .toggle input{accent-color:var(--g)}
+    .empty{color:var(--g3);text-align:center;padding:18px;font-size:11px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>🛜 WIFI · RED TEAM</h1>
+      <span class="sub">testes de segurança WiFi autorizados · recon · detecção de rogue AP · portal de conscientização</span>
+    </div>
+
+    <div class="auth">
+      ⚠ <b>USO AUTORIZADO APENAS.</b> Estas ferramentas só podem ser usadas em redes/dispositivos próprios
+      ou com <b>autorização escrita</b> do dono. O portal cativo só grava dados com a campanha <b>armada</b>
+      (confirmação de autorização) e tudo fica <b>somente local</b>. Sem deauth/jamming. Em outras jurisdições,
+      operar AP falso contra terceiros é crime.
+    </div>
+
+    <div class="auth" id="acessoWarn" style="display:none;background:rgba(255,59,48,.08);border-color:var(--r);color:var(--r)"></div>
+
+    <!-- 1. Adaptadores -->
+    <div class="card">
+      <h2>1 · Adaptadores WiFi</h2>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn" onclick="carregarAdaptadores()">⟳ detectar placas</button>
+        <span class="st" id="adSt">—</span>
+      </div>
+      <div id="adList"><div class="empty">Clique em detectar para listar suas placas WiFi.</div></div>
+      <div class="legend">Selecione a placa para o scan. <b>Múltiplos APs / evil-twin completo não é possível no Windows</b> — precisa de Linux/hostapd ou ESP32.</div>
+    </div>
+
+    <!-- 2. Recon -->
+    <div class="card">
+      <h2>2 · Recon WiFi + detecção de rogue AP</h2>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn" id="scanBtn" onclick="scan()">⟳ escanear redes</button>
+        <span class="st" id="scanSt">—</span>
+      </div>
+      <div id="rogue"></div>
+      <div id="redes"><div class="empty">Nenhum scan ainda.</div></div>
+    </div>
+
+    <!-- 3. Portal cativo -->
+    <div class="card">
+      <h2>3 · Portal cativo (conscientização anti-phishing)</h2>
+      <div class="row" style="margin-bottom:10px">
+        <input id="campanha" placeholder="nome da campanha (ex: cliente-X-2026)" style="flex:1;min-width:200px">
+        <label class="toggle"><input type="checkbox" id="autorizado"> tenho autorização para este teste</label>
+        <button class="btn" id="armBtn" onclick="armar()">▶ armar captura</button>
+        <button class="btn stop" onclick="desarmar()">■ desarmar</button>
+        <span class="st" id="armSt">desarmado — nada será gravado</span>
+      </div>
+      <div id="portais"></div>
+      <div class="row" style="margin-top:12px">
+        <h2 style="margin:0">Capturas (teste) <span class="st" id="nCap"></span></h2>
+        <button class="btn sec" onclick="verCapturas()">⟳ atualizar</button>
+        <button class="btn sec" onclick="limparCapturas()">limpar</button>
+      </div>
+      <div id="capturas"><div class="empty">Sem capturas. Arme a campanha e abra um portal no dispositivo de teste.</div></div>
+      <div class="legend">As páginas mostram uma <b>tela de revelação educativa</b> ao enviar ("isto foi um teste de phishing"). Para um teste real, conecte o dispositivo ao seu AP (Mobile Hotspot/ESP32) e abra a URL do portal.</div>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    let ifaceSel = null, ipLocal = location.hostname;
+
+    fetch('/api/rede/info').then(r=>r.json()).then(d=>{ if(d.ip_local) ipLocal=d.ip_local; }).catch(()=>{});
+
+    function setSt(id,t,c){const e=document.getElementById(id);e.textContent=t;e.className='st '+(c||'')}
+    function showAcesso(a){
+      const w=document.getElementById('acessoWarn');
+      if(a && a.ok===false){ w.style.display='block'; w.innerHTML='🔒 '+(a.msg||'WiFi bloqueado pelo Windows'); }
+      else { w.style.display='none'; }
+    }
+
+    // ── Adaptadores ──────────────────────────────────────────────────────────
+    async function carregarAdaptadores(){
+      setSt('adSt','detectando…','busy');
+      try{
+        const d=await (await fetch('/api/wifi/adaptadores')).json();
+        showAcesso(d.acesso);
+        const ad=d.adaptadores||[];
+        if(!ad.length){document.getElementById('adList').innerHTML='<div class="empty">Nenhuma placa WiFi encontrada.</div>';setSt('adSt','0 placas','err');return;}
+        let h='<table><thead><tr><th>usar</th><th>nome</th><th>descrição</th><th>estado</th><th>SSID/canal</th><th>AP?</th></tr></thead><tbody>';
+        ad.forEach((a,i)=>{
+          h+=`<tr><td><input type="radio" name="iface" ${i===0?'checked':''} onchange="ifaceSel='${a.nome.replace(/'/g,"")}'"></td>
+            <td><b>${a.nome}</b></td><td>${a.descricao}</td><td>${a.estado||'—'}</td>
+            <td>${a.ssid||'—'} ${a.canal?('· ch '+a.canal):''}</td>
+            <td>${a.ap_suportado?'✓':'—'}</td></tr>`;
+        });
+        document.getElementById('adList').innerHTML=h+'</tbody></table>';
+        ifaceSel=ad[0].nome;
+        setSt('adSt',`${ad.length} placa(s)`,'ok');
+      }catch(e){setSt('adSt','erro: '+e.message,'err')}
+    }
+
+    // ── Recon ────────────────────────────────────────────────────────────────
+    async function scan(){
+      const b=document.getElementById('scanBtn');b.disabled=true;
+      setSt('scanSt','escaneando…','busy');
+      try{
+        const d=await (await fetch('/api/wifi/scan',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({interface:ifaceSel})})).json();
+        showAcesso(d.acesso);
+        renderRogue(d.rogue||[]);
+        renderRedes(d.redes||[]);
+        setSt('scanSt',`✓ ${d.n} APs · ${(d.rogue||[]).length} alerta(s)`,'ok');
+      }catch(e){setSt('scanSt','erro: '+e.message,'err')}
+      finally{b.disabled=false}
+    }
+    function renderRogue(al){
+      document.getElementById('rogue').innerHTML = al.map(a=>
+        `<div class="alert">⚠ <b>${a.ssid}</b> — ${a.motivo}</div>`).join('');
+    }
+    function renderRedes(r){
+      if(!r.length){document.getElementById('redes').innerHTML='<div class="empty">Nenhum AP visível.</div>';return;}
+      let h='<table><thead><tr><th>SSID</th><th>BSSID</th><th>sinal</th><th>canal</th><th>segurança</th><th>rádio</th></tr></thead><tbody>';
+      r.forEach(x=>{
+        const w=Math.max(4,(x.sinal||0)*0.5);
+        h+=`<tr class="${x.rogue?'rogue':''}"><td><b>${x.ssid}</b>${x.rogue?' ⚠':''}</td>
+          <td>${x.bssid}</td>
+          <td><span class="bar" style="width:${w}px"></span> ${x.sinal??'—'}%</td>
+          <td>${x.canal||'—'}</td>
+          <td><span class="badge seg-${x.seg}">${x.seg}</span></td>
+          <td>${x.radio||'—'}</td></tr>`;
+      });
+      document.getElementById('redes').innerHTML=h+'</tbody></table>';
+    }
+
+    // ── Portal ───────────────────────────────────────────────────────────────
+    async function carregarPortais(){
+      const d=await (await fetch('/api/wifi/portais')).json();
+      atualizaArm(d.estado);
+      const base=`http://${ipLocal}:8765/portal/`;
+      document.getElementById('portais').innerHTML=(d.portais||[]).map(p=>
+        `<div class="pill"><b>${p}</b>
+           <a class="lnk" href="/portal/${p}" target="_blank">prévia ▸</a>
+           <code>${base}${p}</code>
+           <button class="btn sec" style="padding:3px 8px" onclick="navigator.clipboard.writeText('${base}${p}')">copiar URL</button>
+         </div>`).join('') || '<div class="empty">Sem templates.</div>';
+    }
+    function atualizaArm(e){
+      const on=e&&e.armado;
+      setSt('armSt', on?`● ARMADO · campanha "${e.campanha}" · ${e.n_capturas} capturas`:'desarmado — nada será gravado', on?'ok':'');
+    }
+    async function armar(){
+      const aut=document.getElementById('autorizado').checked;
+      if(!aut){setSt('armSt','marque a confirmação de autorização','err');return;}
+      const d=await (await fetch('/api/wifi/portal/arm',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({campanha:document.getElementById('campanha').value,autorizado:true})})).json();
+      if(d.ok)atualizaArm(d.estado); else setSt('armSt',d.erro||'erro','err');
+    }
+    async function desarmar(){
+      const d=await (await fetch('/api/wifi/portal/desarmar',{method:'POST'})).json();
+      atualizaArm(d.estado);
+    }
+    async function verCapturas(){
+      const d=await (await fetch('/api/wifi/capturas')).json();
+      atualizaArm(d.estado);
+      const c=d.capturas||[];
+      document.getElementById('nCap').textContent=`(${c.length})`;
+      if(!c.length){document.getElementById('capturas').innerHTML='<div class="empty">Sem capturas.</div>';return;}
+      let h='<table><thead><tr><th>quando</th><th>campanha</th><th>portal</th><th>IP</th><th>campos</th></tr></thead><tbody>';
+      c.forEach(x=>{ h+=`<tr><td>${x.ts}</td><td>${x.campanha}</td><td>${x.portal}</td><td>${x.ip||'—'}</td>
+        <td>${Object.entries(x.campos||{}).map(([k,v])=>`${k}=<b>${v}</b>`).join(' · ')}</td></tr>`; });
+      document.getElementById('capturas').innerHTML=h+'</tbody></table>';
+    }
+    async function limparCapturas(){ await fetch('/api/wifi/capturas',{method:'DELETE'}); verCapturas(); }
+
+    carregarPortais(); verCapturas();
+    setInterval(verCapturas, 5000);
+  </script>
+</body>
+</html>

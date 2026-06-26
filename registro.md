@@ -6,6 +6,40 @@
 
 ---
 
+## 2026-06-26 · WiFi Red Team (testes autorizados)
+
+**Pedido do Jean:** aba para testes de WiFi, principalmente engenharia social (portal falso
+estilo evilportal). Contexto: engajamento autorizado de cliente, só Windows por enquanto,
+múltiplos adaptadores (placa interna + USB Realtek). Construir tudo de uma vez.
+
+**Fronteira ética aplicada:** uso só em redes próprias/autorizadas; salvaguardas embutidas
+(consentimento, log local marcado como teste, revelação educativa). **NÃO** foi feito
+deauth/jamming (negação de serviço). Evil-twin completo não roda no Windows (sem modo
+monitor/múltiplos APs) — documentado que precisa de Linux/hostapd ou ESP32.
+
+**Implementação (`wifi_tools.py`, `server.py`, `ui/wifi.html`, `portais/`):**
+- Adaptadores: `netsh wlan show interfaces`+`drivers`, parsing tolerante a locale (strip-accents)
+- Recon: `netsh wlan show networks mode=bssid` → SSID/BSSID/sinal/canal/segurança (dedup por BSSID,
+  SSID oculto tratado)
+- Detecção de rogue AP: agrupa por SSID; flagra segurança mista (evil-twin), clone aberto e
+  múltiplos fabricantes
+- Portal cativo: templates `portais/wifi.html` e `portais/google.html` (standalone, captura→
+  revelação "isto foi phishing"); endpoint `/portal/{nome}`; captura SÓ grava se a campanha
+  estiver ARMADA com autorização; log local `capturas_portal.jsonl` (gitignored)
+- Endpoints: `/api/wifi/adaptadores|scan|portais|portal/arm|portal/desarmar|captura|capturas`
+- `ui/nav.js`: aba "WIFI · RT" (modo idle)
+
+**Causa raiz de fix:** Windows 11 exige **Serviços de Localização ativados** (e às vezes admin)
+para `netsh` ler WiFi — sem isso retorna vazio com "permissão de local"/"exige elevação".
+Adicionado `wifi_tools.checar_acesso()` que detecta e a UI mostra o aviso; após ativar a
+Localização o recon funcionou (21 APs, rogue detectado, ambas as placas listadas).
+
+**Verificado:** 2 adaptadores (Realtek 8821CE PCIe conectada + RTL8192EU USB), 21 APs no recon,
+rogue AP flagrado, portal serve + captura gated por autorização funcionando.
+
+**Pendências:** OUI de AP não mapeado; evil-twin real/monitor mode/handshake fora do Windows
+(precisa Linux/ESP32); QR code do portal não gerado (mostra URL+copiar).
+
 ## 2026-06-26 · Câmeras IP/WiFi — scanner de rede
 
 **Pedido do Jean:** para câmeras WiFi, quero o IP e a rede em que estão conectadas.

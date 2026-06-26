@@ -18,6 +18,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import subprocess
 import threading
 import time
@@ -35,7 +36,7 @@ except ImportError:
 
 import numpy as np
 from scipy import signal as sp_signal
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -49,6 +50,7 @@ import hackrf_resource
 import tscm_scanner
 import tscm_video
 import net_scanner
+import wifi_tools
 try:
     import llm_client
     _LLM_OK = True
@@ -915,6 +917,77 @@ async def rede_scan():
     """Escaneia a rede local e lista dispositivos, destacando câmeras IP/WiFi."""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, net_scanner.escanear)
+
+
+# ─── WiFi Red Team (testes autorizados) ───────────────────────────────────────
+PORTAIS_PATH = Path(__file__).parent / "portais"
+
+
+@app.get("/api/wifi/adaptadores")
+async def wifi_adaptadores():
+    """Lista as placas WiFi e capacidades."""
+    loop = asyncio.get_event_loop()
+    ad = await loop.run_in_executor(None, wifi_tools.listar_adaptadores)
+    return {"adaptadores": ad, "acesso": wifi_tools.checar_acesso()}
+
+
+@app.post("/api/wifi/scan")
+async def wifi_scan(body: dict):
+    """Escaneia APs vizinhos + detecção de rogue AP. Body: { interface?: str }"""
+    interface = body.get("interface") or None
+    loop = asyncio.get_event_loop()
+    redes = await loop.run_in_executor(None, wifi_tools.escanear_redes, interface)
+    alertas = wifi_tools.detectar_rogue(redes)
+    acesso = wifi_tools.checar_acesso() if not redes else {"ok": True}
+    return {"ok": True, "n": len(redes), "redes": redes, "rogue": alertas, "acesso": acesso}
+
+
+@app.get("/api/wifi/portais")
+async def wifi_portais():
+    """Templates de portal disponíveis."""
+    nomes = sorted(p.stem for p in PORTAIS_PATH.glob("*.html")) if PORTAIS_PATH.exists() else []
+    return {"portais": nomes, "estado": wifi_tools.estado_portal()}
+
+
+@app.post("/api/wifi/portal/arm")
+async def wifi_portal_arm(body: dict):
+    """Arma a campanha de portal (exige confirmação de autorização)."""
+    if not body.get("autorizado"):
+        return {"ok": False, "erro": "confirme a autorização para armar a campanha"}
+    return {"ok": True, "estado": wifi_tools.armar_portal(body.get("campanha", ""), True)}
+
+
+@app.post("/api/wifi/portal/desarmar")
+async def wifi_portal_desarmar():
+    return {"ok": True, "estado": wifi_tools.desarmar_portal()}
+
+
+@app.post("/api/wifi/captura")
+async def wifi_captura(body: dict, request: Request):
+    """Recebe a submissão de um portal cativo (grava só se a campanha estiver armada)."""
+    ip = request.client.host if request.client else ""
+    return wifi_tools.registrar_captura(body.get("portal", "?"), body.get("campos", {}), ip)
+
+
+@app.get("/api/wifi/capturas")
+async def wifi_capturas():
+    return {"estado": wifi_tools.estado_portal(), "capturas": wifi_tools.listar_capturas()}
+
+
+@app.delete("/api/wifi/capturas")
+async def wifi_capturas_limpar():
+    wifi_tools.limpar_capturas()
+    return {"ok": True}
+
+
+@app.get("/portal/{nome}")
+async def servir_portal(nome: str):
+    """Serve uma página de portal cativo (standalone, sem nav)."""
+    nome = re.sub(r"[^a-z0-9_-]", "", nome.lower())
+    arq = PORTAIS_PATH / f"{nome}.html"
+    if not arq.exists():
+        raise HTTPException(404, "portal não encontrado")
+    return FileResponse(arq)
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────

