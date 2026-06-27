@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-force-dark>
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,8 +16,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: var(--bg, #0a0a0a);
-      color: var(--text, #e0e0e0);
+      background: var(--bg, var(--painel2));
+      color: var(--text, var(--texto));
       font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
       min-height: 100vh;
     }
@@ -34,18 +34,18 @@
 
     #em-topbar.urgente { background: var(--em-orange); animation: none; }
     #em-topbar.atencao { background: var(--em-yellow); animation: none; }
-    #em-topbar.idle    { background: #222; animation: none; }
+    #em-topbar.idle    { background: var(--borda); animation: none; }
 
     .em-nivel-btn {
       background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
-      color: #fff; font: bold 11px/1 monospace; letter-spacing: 1px;
+      color: var(--texto); font: bold 11px/1 monospace; letter-spacing: 1px;
       padding: 5px 12px; border-radius: 3px; cursor: pointer;
     }
     .em-nivel-btn.active { background: rgba(255,255,255,.4); }
     .em-nivel-btn:hover  { background: rgba(255,255,255,.25); }
 
     #em-nivel-lbl {
-      font: bold 13px/1 monospace; letter-spacing: 3px; color: #fff;
+      font: bold 13px/1 monospace; letter-spacing: 3px; color: var(--texto);
       margin-right: auto;
     }
 
@@ -60,8 +60,8 @@
     }
 
     .em-card {
-      background: var(--bg-secondary, #111);
-      border: 1px solid var(--border, #2a2a2a);
+      background: var(--bg-secondary, var(--painel2));
+      border: 1px solid var(--border, var(--bg3));
       border-radius: 4px;
       padding: 18px 20px;
     }
@@ -77,16 +77,16 @@
     .em-templates { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 
     .em-tpl {
-      background: var(--bg, #0a0a0a); border: 1px solid var(--border, #2a2a2a);
+      background: var(--bg, var(--painel2)); border: 1px solid var(--border, var(--bg3));
       color: var(--text-dim, #888); font: 11px/1 monospace; padding: 5px 10px;
       border-radius: 3px; cursor: pointer;
     }
-    .em-tpl:hover { border-color: var(--em-red); color: var(--text, #e0e0e0); }
+    .em-tpl:hover { border-color: var(--em-red); color: var(--text, var(--texto)); }
 
     #em-texto {
       width: 100%; min-height: 90px; resize: vertical;
-      background: var(--bg, #0a0a0a); border: 1px solid var(--border, #2a2a2a);
-      color: var(--text, #e0e0e0); font: 14px/1.6 monospace;
+      background: var(--bg, var(--painel2)); border: 1px solid var(--border, var(--bg3));
+      color: var(--text, var(--texto)); font: 14px/1.6 monospace;
       padding: 12px; border-radius: 3px;
     }
     #em-texto:focus { outline: none; border-color: var(--em-red); }
@@ -94,8 +94,8 @@
     .em-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 
     .em-select {
-      background: var(--bg, #0a0a0a); border: 1px solid var(--border, #2a2a2a);
-      color: var(--text, #e0e0e0); font: 12px monospace; padding: 5px 8px;
+      background: var(--bg, var(--painel2)); border: 1px solid var(--border, var(--bg3));
+      color: var(--text, var(--texto)); font: 12px monospace; padding: 5px 8px;
       border-radius: 3px;
     }
 
@@ -106,27 +106,27 @@
 
     .em-freq-btn {
       flex: 1; padding: 8px; font: 11px/1 monospace; letter-spacing: 1px;
-      background: var(--bg, #0a0a0a); border: 1px solid var(--border, #2a2a2a);
+      background: var(--bg, var(--painel2)); border: 1px solid var(--border, var(--bg3));
       color: var(--text-dim, #888); border-radius: 3px; cursor: pointer;
     }
     .em-freq-btn:hover, .em-freq-btn.active {
-      border-color: var(--em-red); color: var(--text, #e0e0e0);
+      border-color: var(--em-red); color: var(--text, var(--texto));
     }
 
     #em-freq-lista {
       max-height: 120px; overflow-y: auto;
-      background: var(--bg, #0a0a0a); border: 1px solid var(--border, #2a2a2a);
+      background: var(--bg, var(--painel2)); border: 1px solid var(--border, var(--bg3));
       border-radius: 3px; padding: 6px 8px;
       font: 11px/1.8 monospace; color: var(--text-dim, #888);
       display: flex; flex-wrap: wrap; gap: 4px;
     }
 
     .em-freq-tag {
-      background: #1a1a2a; border: 1px solid #333; border-radius: 2px;
-      padding: 1px 5px; font-size: 10px; color: #88aaff;
+      background: var(--painel2); border: 1px solid #333; border-radius: 2px;
+      padding: 1px 5px; font-size: 10px; color: var(--azul);
       cursor: pointer;
     }
-    .em-freq-tag:hover { border-color: var(--em-red); color: #fff; }
+    .em-freq-tag:hover { border-color: var(--em-red); color: var(--texto); }
 
     .em-counter { font-size: 11px; color: var(--text-dim, #666); margin-top: 6px; }
 
@@ -137,7 +137,7 @@
 
     .em-contato {
       display: flex; align-items: center; gap: 8px;
-      padding: 6px 0; border-bottom: 1px solid var(--border, #1e1e1e);
+      padding: 6px 0; border-bottom: 1px solid var(--border, var(--painel2));
       font-size: 12px;
     }
     .em-contato:last-child { border-bottom: none; }
@@ -152,7 +152,7 @@
 
     @keyframes blink { 50% { opacity:0 } }
 
-    .em-contato-nome { flex: 1; color: var(--text, #e0e0e0); }
+    .em-contato-nome { flex: 1; color: var(--text, var(--texto)); }
     .em-contato-tel  { color: var(--text-dim, #666); font-size: 11px; }
     .em-contato-del  {
       background: none; border: none; color: #555; cursor: pointer;
@@ -162,23 +162,23 @@
 
     .em-add-row { display: flex; gap: 6px; margin-top: 8px; }
     .em-input {
-      flex: 1; background: var(--bg, #0a0a0a); border: 1px solid var(--border, #2a2a2a);
-      color: var(--text, #e0e0e0); font: 12px monospace; padding: 6px 8px; border-radius: 3px;
+      flex: 1; background: var(--bg, var(--painel2)); border: 1px solid var(--border, var(--bg3));
+      color: var(--text, var(--texto)); font: 12px monospace; padding: 6px 8px; border-radius: 3px;
     }
     .em-input:focus { outline: none; border-color: var(--em-red); }
     .em-input::placeholder { color: #444; }
 
     .em-btn-sm {
       padding: 6px 12px; font: bold 11px monospace; letter-spacing: 1px;
-      background: #1e1e1e; border: 1px solid #333; color: var(--text-dim, #888);
+      background: var(--painel2); border: 1px solid #333; color: var(--text-dim, #888);
       border-radius: 3px; cursor: pointer;
     }
-    .em-btn-sm:hover { border-color: var(--em-red); color: #fff; }
+    .em-btn-sm:hover { border-color: var(--em-red); color: var(--texto); }
 
     .em-twilio-hint {
       font-size: 10px; color: #555; margin-top: 8px; line-height: 1.5;
     }
-    .em-twilio-hint code { color: #8888cc; }
+    .em-twilio-hint code { color: var(--roxo); }
 
     /* ── Status ──────────────────────────────────────── */
     #em-status-card { grid-column: 1 / -1; }
@@ -191,7 +191,7 @@
     }
 
     .em-progress-wrap {
-      background: var(--bg, #0a0a0a); border: 1px solid var(--border, #2a2a2a);
+      background: var(--bg, var(--painel2)); border: 1px solid var(--border, var(--bg3));
       border-radius: 3px; overflow: hidden; height: 6px; margin-bottom: 6px;
     }
     .em-progress-fill {
@@ -212,7 +212,7 @@
       max-height: 80px; overflow-y: auto; margin-top: 8px;
       font-size: 10px; color: #666;
     }
-    .em-sms-log-item { padding: 2px 0; border-bottom: 1px solid #1a1a1a; }
+    .em-sms-log-item { padding: 2px 0; border-bottom: 1px solid var(--painel2); }
     .em-sms-log-item.ok   { color: #22cc55; }
     .em-sms-log-item.fail { color: #cc4444; }
 
@@ -222,7 +222,7 @@
     #em-btn-disparar {
       width: 100%; padding: 22px;
       font: bold 16px/1 monospace; letter-spacing: 5px; text-transform: uppercase;
-      background: var(--em-red); color: #fff;
+      background: var(--em-red); color: var(--texto);
       border: none; border-radius: 4px; cursor: pointer;
       transition: background .15s, transform .1s;
     }
@@ -234,10 +234,10 @@
     #em-btn-parar {
       width: 100%; margin-top: 8px; padding: 10px;
       font: 12px monospace; letter-spacing: 2px;
-      background: #1e1e1e; border: 1px solid #444; color: #888;
+      background: var(--painel2); border: 1px solid #444; color: #888;
       border-radius: 4px; cursor: pointer; display: none;
     }
-    #em-btn-parar:hover { border-color: var(--em-red); color: #fff; }
+    #em-btn-parar:hover { border-color: var(--em-red); color: var(--texto); }
   </style>
 </head>
 <body>
@@ -341,10 +341,10 @@
           <div class="em-counter-item" style="color:#4488ff">
             <span id="em-fm-canais" style="font-size:18px;font-weight:bold;display:block">—</span>canais
           </div>
-          <div class="em-counter-item" style="color:#88aaff">
+          <div class="em-counter-item" style="color:var(--azul)">
             <span id="em-fm-freq" style="font-size:14px;font-weight:bold;display:block">—</span>centro MHz
           </div>
-          <div class="em-counter-item" style="color:#aaaaff">
+          <div class="em-counter-item" style="color:var(--azul)">
             <span id="em-fm-sr" style="font-size:14px;font-weight:bold;display:block">—</span>Msps
           </div>
         </div>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-force-dark>
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,9 +16,9 @@
       --ciano:    #00FFCC;
       --cinza:    #3a3a3a;
       --fundo:    #000;
-      --painel:   #080808;
-      --borda:    #181818;
-      --texto:    #b0b0b0;
+      --painel:   var(--painel2);
+      --borda:    var(--borda);
+      --texto:    var(--texto);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,7 +40,7 @@
       gap: 16px;
       position: sticky;
       top: 0;
-      background: #020202;
+      background: var(--painel2);
       z-index: 100;
     }
     .logo { color: var(--verde); font-size: 14px; font-weight: 700; letter-spacing: 3px; }
@@ -90,7 +90,7 @@
       overflow: hidden;
     }
     .pt {
-      background: #0c0c0c;
+      background: var(--painel2);
       border-bottom: 1px solid var(--borda);
       padding: 8px 14px;
       font-size: 10px;
@@ -111,14 +111,14 @@
     .row { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
     .lbl { font-size:10px; color:#555; min-width:62px; letter-spacing:.5px; }
     input[type="text"], input[type="number"], select {
-      background:#0f0f0f; border:1px solid var(--cinza);
+      background:var(--painel2); border:1px solid var(--cinza);
       color:var(--verde); font-family:inherit; font-size:13px;
       padding:5px 8px; border-radius:3px; outline:none;
     }
     input[type="number"] { width:85px; }
     input[type="text"]   { width:120px; }
     select { color:var(--texto); min-width:160px; }
-    select option { background:#0f0f0f; }
+    select option { background:var(--painel2); }
     input:focus, select:focus { border-color:var(--verde); }
 
     .btn {
@@ -146,13 +146,13 @@
     /* ── ESCUTAR ─────────────────────────────── */
     canvas.onda {
       width:100%; height:64px; display:block;
-      background:#030303; border:1px solid #141414; border-radius:3px;
+      background:var(--painel2); border:1px solid var(--painel2); border-radius:3px;
       margin:10px 0 6px;
     }
     .db-row { display:flex; align-items:center; gap:10px; }
     .db-val { min-width:60px; font-size:11px; color:#555; }
     .db-track {
-      flex:1; height:3px; background:#111; border-radius:2px; overflow:hidden;
+      flex:1; height:3px; background:var(--painel2); border-radius:2px; overflow:hidden;
     }
     .db-fill { height:100%; background:var(--verde); width:0%; transition:width .1s; }
 
@@ -161,26 +161,26 @@
     .freq-lista { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
     .freq-item {
       display:flex; align-items:center; gap:8px;
-      padding:6px 8px; background:#060606;
-      border:1px solid #141414; border-radius:3px;
+      padding:6px 8px; background:var(--painel2);
+      border:1px solid var(--painel2); border-radius:3px;
     }
     .fq-hz   { min-width:72px; color:var(--verde); font-size:12px; }
     .fq-nome { min-width:100px; color:#555; font-size:10px; overflow:hidden; white-space:nowrap; }
-    .fq-bar-wrap { flex:1; height:5px; background:#111; border-radius:2px; overflow:hidden; }
+    .fq-bar-wrap { flex:1; height:5px; background:var(--painel2); border-radius:2px; overflow:hidden; }
     .fq-bar  { height:100%; border-radius:2px; transition:width .5s; }
     .fq-dbm  { min-width:58px; text-align:right; font-size:11px; color:#555; }
     .fq-delta{ min-width:18px; text-align:center; font-size:11px; }
-    .fq-rm   { background:none; border:none; color:#2a2a2a; cursor:pointer; font-size:12px; padding:0 3px; }
+    .fq-rm   { background:none; border:none; color:var(--bg3); cursor:pointer; font-size:12px; padding:0 3px; }
     .fq-rm:hover { color:var(--vermelho); }
 
     canvas.chart {
       width:100%; height:130px; display:block;
-      background:#030303; border:1px solid #141414; border-radius:3px;
+      background:var(--painel2); border:1px solid var(--painel2); border-radius:3px;
     }
 
     /* ── CLONAR ──────────────────────────────── */
     .prog-wrap {
-      height:2px; background:#111; border-radius:1px; overflow:hidden;
+      height:2px; background:var(--painel2); border-radius:1px; overflow:hidden;
       margin-top:8px; opacity:0; transition:opacity .2s;
     }
     .prog-wrap.vis { opacity:1; }
@@ -192,8 +192,8 @@
     }
     .sinal-item {
       display:flex; align-items:center; gap:8px;
-      padding:6px 8px; background:#060606;
-      border:1px solid #141414; border-radius:3px;
+      padding:6px 8px; background:var(--painel2);
+      border:1px solid var(--painel2); border-radius:3px;
     }
     .sn-nome { flex:1; color:var(--verde); font-size:11px; }
     .sn-sz   { color:#444; font-size:10px; min-width:50px; text-align:right; }
@@ -212,14 +212,14 @@
     .band-btn.sel   { border-color:var(--azul); color:var(--azul); background:rgba(79,175,255,.1); }
     .ac-item {
       display:flex; align-items:center; gap:8px;
-      padding:7px 10px; background:#050505;
-      border:1px solid #141414; border-radius:3px; cursor:pointer; transition:border-color .15s;
+      padding:7px 10px; background:var(--painel2);
+      border:1px solid var(--painel2); border-radius:3px; cursor:pointer; transition:border-color .15s;
     }
-    .ac-item:hover    { border-color:#2a2a2a; }
+    .ac-item:hover    { border-color:var(--bg3); }
     .ac-item.anomalia { border-color:rgba(245,216,0,.25); }
     .ac-freq  { min-width:76px; font-size:13px; font-weight:600; }
     .ac-nome  { flex:1; font-size:10px; color:#555; }
-    .ac-bar   { width:70px; height:3px; background:#111; border-radius:2px; overflow:hidden; }
+    .ac-bar   { width:70px; height:3px; background:var(--painel2); border-radius:2px; overflow:hidden; }
     .ac-bar-f { height:100%; border-radius:2px; }
     .ac-dbm   { min-width:62px; text-align:right; font-size:11px; }
     .ac-capbtn {
@@ -566,7 +566,7 @@ function desenharOnda() {
   const cv = document.getElementById('ondaCanvas');
   const ctx = cv.getContext('2d');
   const W = cv.width, H = cv.height;
-  ctx.fillStyle = '#030303';
+  ctx.fillStyle = 'var(--painel2)';
   ctx.fillRect(0, 0, W, H);
   ctx.strokeStyle = '#47DF7F';
   ctx.lineWidth = 1.2;
@@ -835,11 +835,11 @@ function desenharChart() {
   const ctx = cv.getContext('2d');
   const W = cv.width, H = cv.height;
 
-  ctx.fillStyle = '#030303';
+  ctx.fillStyle = 'var(--painel2)';
   ctx.fillRect(0, 0, W, H);
 
   // Grid
-  ctx.strokeStyle = '#111';
+  ctx.strokeStyle = 'var(--painel2)';
   ctx.lineWidth = 1;
   const dbStep = 10;
   for (let db = -100; db <= -40; db += dbStep) {
@@ -1194,19 +1194,19 @@ setTimeout(emRenderFreqs, 0);
 .em-lbl { font-size: 9px; color: #555; letter-spacing: 1px; min-width: 80px; margin-top: 6px; }
 textarea.em-txt {
   flex: 1; min-width: 280px; height: 70px;
-  background: #070700; border: 1px solid rgba(255,59,48,.25);
+  background: var(--painel2); border: 1px solid rgba(255,59,48,.25);
   color: var(--amarelo); font-family: inherit; font-size: 11px;
   padding: 7px 10px; outline: none; resize: vertical;
 }
 textarea.em-txt:focus { border-color: rgba(255,59,48,.6); }
 select.em-sel {
-  background: #0a0000; border: 1px solid rgba(255,59,48,.25);
-  color: #bbb; font-family: inherit; font-size: 10px;
+  background: var(--painel2); border: 1px solid rgba(255,59,48,.25);
+  color: var(--g2); font-family: inherit; font-size: 10px;
   padding: 4px 7px; outline: none; min-width: 130px;
 }
 input.em-num {
-  background: #0a0000; border: 1px solid rgba(255,59,48,.25);
-  color: #bbb; font-family: inherit; font-size: 11px;
+  background: var(--painel2); border: 1px solid rgba(255,59,48,.25);
+  color: var(--g2); font-family: inherit; font-size: 11px;
   padding: 4px 7px; outline: none; width: 60px; text-align: center;
 }
 #emFreqs { display: flex; flex-direction: column; gap: 4px; }
@@ -1219,7 +1219,7 @@ input.em-num {
 }
 .em-btn-prep:hover { background: rgba(245,216,0,.07); }
 .em-btn-tx {
-  background: var(--verm); border: none; color: #fff; font-weight: 700;
+  background: var(--verm); border: none; color: var(--texto); font-weight: 700;
 }
 .em-btn-tx:hover { opacity: .85; }
 .em-btn-stop {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-force-dark>
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,8 +9,8 @@
     :root {
       --verde:   #47DF7F; --amarelo: #F5D800; --verm:   #FF4444;
       --azul:    #4FAFFF; --roxo:    #CC44FF; --ciano:  #00FFCC;
-      --cinza:   #333;    --fundo:   #000;    --painel: #060608;
-      --borda:   #141416; --txt:     #999;
+      --cinza:   #333;    --fundo:   #000;    --painel: var(--painel2);
+      --borda:   var(--painel2); --txt:     #999;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -25,11 +25,11 @@
       border-bottom: 1px solid var(--borda);
       padding: 8px 18px;
       display: flex; align-items: center; gap: 14px;
-      background: #020204;
+      background: var(--painel2);
       position: sticky; top: 0; z-index: 200;
     }
     .logo { color: var(--verde); font-size: 13px; font-weight: 700; letter-spacing: 3px; }
-    .sep  { color: #2a2a2a; }
+    .sep  { color: var(--bg3); }
     .sub  { color: #3a3a3a; font-size: 10px; letter-spacing: 2px; }
     a.back { color: #333; text-decoration: none; font-size: 10px; }
     a.back:hover { color: var(--verde); }
@@ -56,7 +56,7 @@
       border-radius: 4px;
     }
     .bx-head {
-      background: #0a0a0d; border-bottom: 1px solid var(--borda);
+      background: var(--painel2); border-bottom: 1px solid var(--borda);
       padding: 6px 12px; display: flex; align-items: center; gap: 8px;
       font-size: 9px; letter-spacing: 2.5px; color: var(--verde);
     }
@@ -70,14 +70,14 @@
     canvas.panorama {
       width: 100%; height: 100px;
       display: block;
-      background: #020205;
+      background: var(--painel2);
       cursor: crosshair;
     }
     canvas.waterfall {
       width: 100%; height: 60px;
       display: block;
-      background: #010103;
-      border-top: 1px solid #0f0f12;
+      background: var(--painel2);
+      border-top: 1px solid var(--painel2);
     }
     .freq-axis {
       display: flex;
@@ -89,7 +89,7 @@
     .pan-tooltip {
       position: absolute; top: 4px; left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,.9); border: 1px solid #222;
+      background: rgba(0,0,0,.9); border: 1px solid var(--borda);
       padding: 3px 10px; border-radius: 3px;
       font-size: 10px; color: var(--verde);
       pointer-events: none; display: none;
@@ -111,13 +111,13 @@
     canvas.galaxy {
       width: 100%; height: 280px;
       display: block;
-      background: #010204;
+      background: var(--painel2);
       cursor: crosshair;
       border-radius: 3px;
     }
     .galaxy-tip {
       position: absolute;
-      background: rgba(0,0,0,.92); border: 1px solid #1a1a2a;
+      background: rgba(0,0,0,.92); border: 1px solid var(--painel2);
       padding: 4px 10px; border-radius: 3px;
       font-size: 10px; color: var(--verde);
       pointer-events: none; display: none; white-space: nowrap;
@@ -128,13 +128,13 @@
       display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;
     }
     input.sig-filter {
-      background: #0c0c10; border: 1px solid #222;
+      background: var(--painel2); border: 1px solid var(--borda);
       color: var(--verde); font-family: inherit; font-size: 11px;
       padding: 4px 8px; border-radius: 3px; outline: none; width: 120px;
     }
     input.sig-filter:focus { border-color: var(--verde); }
     .sort-btn {
-      background: none; border: 1px solid #222; color: #444;
+      background: none; border: 1px solid var(--borda); color: #444;
       font-family: inherit; font-size: 9px; padding: 3px 8px;
       border-radius: 3px; cursor: pointer; letter-spacing: 1px;
     }
@@ -148,21 +148,21 @@
     }
     table.sig-tbl th {
       font-size: 9px; color: #333; letter-spacing: 1px;
-      padding: 4px 6px; border-bottom: 1px solid #111;
+      padding: 4px 6px; border-bottom: 1px solid var(--painel2);
       text-align: left; font-weight: 400; white-space: nowrap;
       cursor: pointer;
     }
     table.sig-tbl th:hover { color: var(--verde); }
     table.sig-tbl td {
       font-size: 11px; padding: 4px 6px;
-      border-bottom: 1px solid #0a0a0a;
+      border-bottom: 1px solid var(--painel2);
       white-space: nowrap;
     }
-    table.sig-tbl tr:hover td { background: #0c0c10; }
+    table.sig-tbl tr:hover td { background: var(--painel2); }
     .td-freq { color: var(--verde); font-weight: 600; }
     .td-dbm  { color: var(--txt); }
     .td-cat  { font-size: 9px; padding: 1px 5px; border-radius: 3px; letter-spacing: 1px; }
-    .td-bar-wrap { width: 80px; height: 4px; background: #111; border-radius: 2px; overflow: hidden; display: inline-block; }
+    .td-bar-wrap { width: 80px; height: 4px; background: var(--painel2); border-radius: 2px; overflow: hidden; display: inline-block; }
     .td-bar  { height: 100%; border-radius: 2px; }
     .td-novo { color: var(--amarelo); font-size: 9px; }
 
@@ -175,7 +175,7 @@
     }
     .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .cat-nome { min-width: 90px; font-size: 10px; color: #555; }
-    .cat-bar-wrap { flex: 1; height: 4px; background: #0f0f0f; border-radius: 2px; overflow: hidden; }
+    .cat-bar-wrap { flex: 1; height: 4px; background: var(--painel2); border-radius: 2px; overflow: hidden; }
     .cat-bar { height: 100%; border-radius: 2px; transition: width .5s; }
     .cat-n { min-width: 30px; text-align: right; font-size: 10px; color: #444; }
 
@@ -186,8 +186,8 @@
     }
     .feed-item {
       display: flex; align-items: center; gap: 7px;
-      padding: 5px 7px; background: #060608;
-      border: 1px solid #0e0e12; border-radius: 3px;
+      padding: 5px 7px; background: var(--painel2);
+      border: 1px solid var(--painel2); border-radius: 3px;
       animation: fadeSlide .4s ease;
     }
     @keyframes fadeSlide {
@@ -199,14 +199,14 @@
     .fi-dbm  { color: #555; font-size: 10px; min-width: 45px; }
     .fi-cat  { font-size: 9px; min-width: 70px; }
     .fi-desc { color: #333; font-size: 9px; overflow: hidden; white-space: nowrap; }
-    .fi-ts   { margin-left: auto; color: #222; font-size: 9px; }
+    .fi-ts   { margin-left: auto; color: var(--borda); font-size: 9px; }
 
     /* ── CATEGORY CHIPS ──────────────────────── */
     .cat-chips {
       display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;
     }
     .chip {
-      background: none; border: 1px solid #1e1e22; color: #3a3a44;
+      background: none; border: 1px solid var(--painel2); color: #3a3a44;
       font-family: inherit; font-size: 9px; padding: 3px 9px; border-radius: 12px;
       cursor: pointer; letter-spacing: 1px; transition: all .15s; white-space: nowrap;
     }
@@ -216,7 +216,7 @@
     /* ── MINI PLAYER ─────────────────────────── */
     #miniPlayer {
       position: fixed; bottom: 20px; right: 20px; z-index: 500;
-      background: #08080e; border: 1px solid rgba(71,223,127,.4);
+      background: var(--painel2); border: 1px solid rgba(71,223,127,.4);
       border-radius: 6px; padding: 10px 14px; min-width: 280px;
       box-shadow: 0 0 24px rgba(71,223,127,.12);
       display: none;
@@ -231,7 +231,7 @@
     .mp-close:hover { color: var(--verm); }
     .mp-controls { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
     .mp-btn {
-      background: transparent; border: 1px solid #222; color: #555;
+      background: transparent; border: 1px solid var(--borda); color: #555;
       font-family: inherit; font-size: 9px; padding: 4px 10px; border-radius: 3px;
       cursor: pointer; letter-spacing: 1px; white-space: nowrap;
     }
@@ -241,10 +241,10 @@
     .mp-db { font-size: 10px; color: #444; margin-left: auto; }
     canvas.mp-onda {
       width: 100%; height: 36px; display: block;
-      background: #030303; border: 1px solid #101010; border-radius: 3px;
+      background: var(--painel2); border: 1px solid var(--painel2); border-radius: 3px;
     }
     .td-play {
-      background: none; border: none; color: #2a2a2a; cursor: pointer;
+      background: none; border: none; color: var(--bg3); cursor: pointer;
       font-size: 11px; padding: 2px 5px; border-radius: 3px;
     }
     .td-play:hover { color: var(--verde); background: rgba(71,223,127,.08); }
@@ -260,12 +260,12 @@
     /* ── SCROLLBAR ────────────────────────────── */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: #000; }
-    ::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb { background: var(--borda); border-radius: 2px; }
 
     /* ── WATERFALL HIST ───────────────────────── */
     canvas.wf-hist {
       width: 100%; height: 50px; display: block;
-      background: #010103;
+      background: var(--painel2);
     }
   </style>
 </head>
@@ -697,12 +697,12 @@ function desenharGalaxia(sinais) {
   }
 
   // Eixos sutis
-  ctx.strokeStyle = '#0f0f14';
+  ctx.strokeStyle = 'var(--painel2)';
   ctx.lineWidth = 1;
   for (let db = DB_MIN; db <= DB_MAX; db += 15) {
     const y = H - PAD_BOT - (db - DB_MIN) / (DB_MAX - DB_MIN) * (H - PAD_TOP - PAD_BOT);
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    ctx.fillStyle = '#222'; ctx.font = '9px JetBrains Mono';
+    ctx.fillStyle = 'var(--borda)'; ctx.font = '9px JetBrains Mono';
     ctx.fillText(db + 'dB', 3, y - 2);
   }
 
@@ -1107,7 +1107,7 @@ function _mpDesenhar() {
   const cv  = document.getElementById('mpOnda');
   const ctx = cv.getContext('2d');
   const W = cv.width, H = cv.height;
-  ctx.fillStyle = '#030303';
+  ctx.fillStyle = 'var(--painel2)';
   ctx.fillRect(0, 0, W, H);
   ctx.strokeStyle = '#47DF7F';
   ctx.lineWidth = 1.2;
@@ -1158,7 +1158,7 @@ setTimeout(() => {
 <style>
 #aiPanel {
   position: fixed; bottom: 16px; left: 16px; width: 340px;
-  background: #04040a; border: 1px solid rgba(71,223,127,.25);
+  background: var(--painel2); border: 1px solid rgba(71,223,127,.25);
   z-index: 600; display: none; flex-direction: column;
   box-shadow: 0 0 20px rgba(71,223,127,.08);
   font-family: 'JetBrains Mono', monospace;
@@ -1179,14 +1179,14 @@ setTimeout(() => {
 }
 .ai-msg { padding: 5px 8px; border-radius: 2px; font-size: 10px; line-height: 1.6; }
 .ai-msg.user { background: rgba(71,223,127,.06); color: var(--verde); text-align: right; border: 1px solid rgba(71,223,127,.15); }
-.ai-msg.bot  { background: #070710; color: #aaa; border: 1px solid #1a1a24; }
+.ai-msg.bot  { background: var(--painel2); color: var(--g2); border: 1px solid var(--painel2); }
 .ai-msg.sys  { color: #333; font-size: 9px; font-style: italic; }
 #aiInputRow {
   display: flex; gap: 5px; padding: 6px 8px;
   border-top: 1px solid rgba(71,223,127,.12);
 }
 #aiInput {
-  flex: 1; background: #0a0a12; border: 1px solid #1a1a24;
+  flex: 1; background: var(--painel2); border: 1px solid var(--painel2);
   color: var(--verde); font-family: inherit; font-size: 10px;
   padding: 4px 7px; outline: none;
 }
@@ -1201,7 +1201,7 @@ setTimeout(() => {
 /* Botão flutuante para abrir */
 #aiFab {
   position: fixed; bottom: 16px; left: 16px;
-  background: #04040a; border: 1px solid rgba(71,223,127,.35);
+  background: var(--painel2); border: 1px solid rgba(71,223,127,.35);
   color: var(--verde); font-family: inherit; font-size: 10px;
   padding: 6px 12px; cursor: pointer; z-index: 599;
   letter-spacing: 1px; transition: all .2s;
@@ -1211,8 +1211,8 @@ setTimeout(() => {
 </style>
 
 <div style="position:fixed;bottom:16px;left:16px;z-index:599;display:flex;gap:5px">
-  <button id="aiFab" onclick="aiAbrir()" style="background:#04040a;border:1px solid rgba(71,223,127,.35);color:var(--verde);font-family:'JetBrains Mono',monospace;font-size:10px;padding:6px 12px;cursor:pointer;letter-spacing:1px">🤖 IA RF</button>
-  <button onclick="aiAcoes()" style="background:#04040a;border:1px solid rgba(71,223,127,.2);color:#555;font-family:'JetBrains Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;letter-spacing:.5px" title="Ações rápidas do agente">⚡ AÇÕES</button>
+  <button id="aiFab" onclick="aiAbrir()" style="background:var(--painel2);border:1px solid rgba(71,223,127,.35);color:var(--verde);font-family:'JetBrains Mono',monospace;font-size:10px;padding:6px 12px;cursor:pointer;letter-spacing:1px">🤖 IA RF</button>
+  <button onclick="aiAcoes()" style="background:var(--painel2);border:1px solid rgba(71,223,127,.2);color:#555;font-family:'JetBrains Mono',monospace;font-size:9px;padding:6px 10px;cursor:pointer;letter-spacing:.5px" title="Ações rápidas do agente">⚡ AÇÕES</button>
 </div>
 
 <div id="aiPanel">
@@ -1331,13 +1331,13 @@ function aiAcoes() {
   document.querySelectorAll('.ai-action-row').forEach(e => e.remove());
   const row = document.createElement('div');
   row.className = 'ai-action-row';
-  row.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;padding:6px 0;border-top:1px solid #141420;margin-top:4px';
+  row.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;padding:6px 0;border-top:1px solid var(--painel2);margin-top:4px';
   _QUICK_ACTIONS.forEach(a => {
     const btn = document.createElement('button');
-    btn.style.cssText = 'background:transparent;border:1px solid #1a1a28;color:#555;font-family:var(--font);font-size:9px;padding:3px 7px;cursor:pointer;letter-spacing:.5px;transition:all .15s';
+    btn.style.cssText = 'background:transparent;border:1px solid var(--painel2);color:#555;font-family:var(--font);font-size:9px;padding:3px 7px;cursor:pointer;letter-spacing:.5px;transition:all .15s';
     btn.textContent = `${a.emoji} ${a.label}`;
     btn.onmouseover = () => { btn.style.borderColor='rgba(71,223,127,.4)'; btn.style.color='#47DF7F'; };
-    btn.onmouseleave = () => { btn.style.borderColor='#1a1a28'; btn.style.color='#555'; };
+    btn.onmouseleave = () => { btn.style.borderColor='var(--painel2)'; btn.style.color='#555'; };
     btn.onclick = () => {
       document.getElementById('aiInput').value = a.prompt;
       aiEnviar();
