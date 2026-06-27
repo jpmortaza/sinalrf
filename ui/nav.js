@@ -21,22 +21,24 @@
       { href: '/radio.html',     label: 'Rádio FM',      icon: '📻' },
       { href: '/adsb.html',      label: 'Aviões ADS-B',  icon: '✈️' },
       { href: '/ism.html',       label: 'ISM / IoT',     icon: '📟' },
-      { href: '/intercept.html', label: 'IMSI',          icon: '📱' },
     ]},
     { g: 'Rede & WiFi', itens: [
       { href: '/rede.html',      label: 'Câmeras IP',    icon: '📷' },
       { href: '/wifi.html',      label: 'WiFi Red Team', icon: '🛜' },
     ]},
-    { g: 'Sinais & Defesa', itens: [
-      { href: '/gps.html',       label: 'GPS Jamming',   icon: '🛰️' },
-      { href: '/doppler.html',   label: 'Doppler',       icon: '🫀' },
-      { href: '/health.html',    label: 'Saúde RF',      icon: '❤️' },
-      { href: '/3d.html',        label: 'Ambiente 3D',   icon: '🔮' },
-      { href: '/emergencia.html',label: 'Emergência',    icon: '🚨' },
+    { g: 'Defesa', itens: [
+      { href: '/gps.html',       label: 'GPS (jamming)', icon: '🛰️' },
     ]},
     { g: 'Dados', itens: [
       { href: '/historico.html', label: 'Histórico',     icon: '🗂' },
       { href: '/alertas.html',   label: 'Alertas',       icon: '🔔' },
+    ]},
+    { g: 'Extras (experimental)', fechado: true, itens: [
+      { href: '/doppler.html',   label: 'Doppler/Presença', icon: '🫀' },
+      { href: '/health.html',    label: 'Saúde RF',      icon: '❤️' },
+      { href: '/3d.html',        label: 'Ambiente 3D',   icon: '🔮' },
+      { href: '/intercept.html', label: 'IMSI (WSL2)',   icon: '📱' },
+      { href: '/emergencia.html',label: 'Emergência TX', icon: '🚨' },
     ]},
   ];
 
@@ -84,7 +86,9 @@
   function buildNav() {
     const grupos = GRUPOS.map(grp => {
       const ativo = grp.itens.some(p => isActive(p.href));
-      const closed = !ativo && grpClosed(grp.g);
+      const salvo = localStorage.getItem('srf-grp-' + grp.g);
+      const fechadoPadrao = salvo === null ? !!grp.fechado : salvo === '1';
+      const closed = !ativo && fechadoPadrao;
       const links = grp.itens.map(p =>
         `<a class="srf-link${isActive(p.href) ? ' active' : ''}" href="${p.href}"><span class="srf-icon">${p.icon}</span>${p.label}</a>`
       ).join('');

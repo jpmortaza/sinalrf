@@ -514,29 +514,26 @@ class ProcessadorSinal:
         var          = self.variancia_rssi()
         rssi_atual   = round(self.buf_rssi[-1], 1) if self.buf_rssi else -99
 
-        # Dados de áudio (sensor independente)
+        # Dados de áudio (sensor independente) — sempre definido para o payload
         audio = sensor_audio.estado()
-        resp_a = audio["respiracao"]
-        card_a = audio["batimentos"]
+        resp_a = audio["respiracao"]; card_a = audio["batimentos"]
 
-        # Fusão: prioriza áudio quando confiança > WiFi
-        if resp_a["confianca"] > cr_w:
-            resp_final = resp_a["bpm"]
-            conf_r_final = resp_a["confianca"]
-            fonte_resp = "audio"
+        # Integridade: sem fonte de RSSI real (ex.: Windows, sem leitor CoreWLAN),
+        # NÃO inventamos vitais. Marcamos como indisponível em vez de simular.
+        if not self.modo_real:
+            resp_final = card_final = 0.0
+            conf_r_final = conf_c_final = 0.0
+            fonte_resp = fonte_card = "indisponível"
         else:
-            resp_final = resp_w
-            conf_r_final = cr_w
-            fonte_resp = "wifi"
-
-        if card_a["confianca"] > cc_w:
-            card_final = card_a["bpm"]
-            conf_c_final = card_a["confianca"]
-            fonte_card = "audio"
-        else:
-            card_final = card_w
-            conf_c_final = cc_w
-            fonte_card = "wifi"
+            # Fusão: prioriza áudio quando confiança > WiFi
+            if resp_a["confianca"] > cr_w:
+                resp_final, conf_r_final, fonte_resp = resp_a["bpm"], resp_a["confianca"], "audio"
+            else:
+                resp_final, conf_r_final, fonte_resp = resp_w, cr_w, "wifi"
+            if card_a["confianca"] > cc_w:
+                card_final, conf_c_final, fonte_card = card_a["bpm"], card_a["confianca"], "audio"
+            else:
+                card_final, conf_c_final, fonte_card = card_w, cc_w, "wifi"
 
         return {
             "ts":        round(time.time(), 3),

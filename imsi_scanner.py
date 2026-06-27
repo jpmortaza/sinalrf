@@ -11,6 +11,7 @@ Dependências:
   - gr-gsm          (duplo clique em '📱 Instalar gr-gsm.command' — não disponível via brew)
 """
 
+import sys
 import subprocess
 import threading
 import socket
@@ -289,10 +290,14 @@ class ScannerIMSI:
             with self._lock:
                 self._freq_atual = fmhz
 
-            # Mata grgsm anterior e libera porta
-            subprocess.run(['pkill', '-9', '-f', 'grgsm'], capture_output=True)
-            subprocess.run('lsof -ti :4729 | xargs kill -9 2>/dev/null',
-                           shell=True, capture_output=True)
+            # Mata grgsm anterior e libera porta (cross-platform)
+            hackrf_resource.matar('grgsm')
+            if sys.platform != 'win32':
+                try:
+                    subprocess.run('lsof -ti :4729 | xargs kill -9 2>/dev/null',
+                                   shell=True, capture_output=True)
+                except OSError:
+                    pass
             time.sleep(1.0)
 
             # Adquire lock exclusivo para o grgsm (pode durar minutos)
