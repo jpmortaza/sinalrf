@@ -1,8 +1,8 @@
-# 📡 SinalRF
+# 📡 mtzRF
 
 **Plataforma de sensoriamento RF em tempo real para HackRF One.**
 
-SinalRF concentra numa única interface web local todas as capacidades do HackRF One —
+mtzRF concentra numa única interface web local todas as capacidades do HackRF One —
 espectro, presença por Doppler, rádio FM, interceptação GSM/IMSI, ambiente RF 3D e
 análise por IA local — sem depender de nuvem. Backend em Python + FastAPI, frontend
 em HTML/JS puro, com streaming de dados via WebSocket a 10 Hz.
@@ -126,7 +126,7 @@ python3 -m venv .venv
 .venv/bin/python server.py
 ```
 
-No macOS também existe o launcher **`🚀 Iniciar SinalRF.command`** (duplo clique no Finder).
+No macOS também existe o launcher **`🚀 Iniciar mtzRF.command`** (duplo clique no Finder).
 
 Com o servidor no ar, acesse: **http://localhost:8765**
 

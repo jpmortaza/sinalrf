@@ -1,5 +1,5 @@
 """
-SinalRF — Scanner de Espectro Wideband
+mtzRF — Scanner de Espectro Wideband
 Usa hackrf_sweep para varrer 88–1000 MHz.
 Detecta sinais de rádio FM, anomalias (sinais fantasmas) e
 monitora todo o espectro visível ao HackRF.
@@ -251,7 +251,7 @@ class ScannerEspectro:
 # ─── Teste ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import json
-    print("\n📡 SinalRF — Teste Scanner Espectro\n")
+    print("\n📡 mtzRF — Teste Scanner Espectro\n")
     s = ScannerEspectro()
     if s.disponivel:
         s.iniciar()

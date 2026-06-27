@@ -1,4 +1,4 @@
-# Registro de Mudanças — mtzHRF
+# Registro de Mudanças — mtzRF
 
 > Sempre atualize este arquivo ao concluir uma tarefa significativa.
 > **Novas entradas vão no TOPO.**
@@ -117,9 +117,9 @@ entrar na transmissão (áudio) para identificar o sinal. Fase 1: detectar+class
 digitais/WiFi (criptografadas) não são decodificáveis — só detectadas. IMSI segue
 indisponível no Windows (gr-gsm é Linux/Mac).
 
-## 2026-06-12 · v3.0 — mtzHRF: renome, IA local, emergência, Doppler WiFi, template (commit dcfd462)
+## 2026-06-12 · v3.0 — mtzRF: renome, IA local, emergência, Doppler WiFi, template (commit dcfd462)
 
-**Pedido do Jean:** renomear SinalRF para mtzHRF, integrar LLM local (Ollama/qwen2.5:3b), criar página Doppler WiFi com IA, broadcast de emergência FM com TTS, unificar intercept+IMSI em uma página, corrigir identidade visual de todas as páginas, e aplicar template mtz-ag/dev-template.
+**Pedido do Jean:** renomear mtzRF para mtzRF, integrar LLM local (Ollama/qwen2.5:3b), criar página Doppler WiFi com IA, broadcast de emergência FM com TTS, unificar intercept+IMSI em uma página, corrigir identidade visual de todas as páginas, e aplicar template mtz-ag/dev-template.
 
 **Causa raiz de fixes:**
 - grgsm: gain hardcoded em 10dB → corrigido para LNA=40/VGA=40 em `grgsm_fixed.py`
@@ -142,7 +142,7 @@ indisponível no Windows (gr-gsm é Linux/Mac).
 - `ui/radio.html` — emergência climática (TTS, multi-freq, 101 canais FM)
 - `ui/scanner.html` — sem AudioContext; IA com ações rápidas
 - `ui/3d.html` — Doppler bubble, WiFi pillars, signal pillars, campos corretos
-- `ui/nav.js` — entrada DOPPLER 🫀; logo mtzHRF
+- `ui/nav.js` — entrada DOPPLER 🫀; logo mtzRF
 - `CLAUDE.md` — protocolo obrigatório adicionado; docs atualizados
 - `AGENTS.md`, `prd.md`, `registro.md`, `base-conhecimento/` — template mtz-ag/dev-template aplicado
 
@@ -153,7 +153,7 @@ indisponível no Windows (gr-gsm é Linux/Mac).
 - `grgsm_fixed.py` — novo
 - `grgsm_scanner_fixed.py` — novo
 - `imsi_scanner.py` — usa grgsm_fixed via shebang, pausa todos os sensores antes de escanear
-- `ui/` — todos os arquivos atualizados (renome SinalRF→mtzHRF, nav.js unificado)
+- `ui/` — todos os arquivos atualizados (renome mtzRF→mtzRF, nav.js unificado)
 - `ui/doppler.html` — novo
 - `.gitignore` — adicionado `.deps_build/`
 - `CLAUDE.md`, `AGENTS.md`, `prd.md`, `registro.md`, `base-conhecimento/` — template aplicado
@@ -165,7 +165,7 @@ indisponível no Windows (gr-gsm é Linux/Mac).
 
 ---
 
-## 2026-06-11 · v2.0 — SinalRF: plataforma RF+HackRF+IMSI (commit 481f0e3)
+## 2026-06-11 · v2.0 — mtzRF: plataforma RF+HackRF+IMSI (commit 481f0e3)
 
 **Pedido do Jean:** base da plataforma — dashboard WiFi, espectro, IMSI catcher, rádio FM, ambiente 3D.
 

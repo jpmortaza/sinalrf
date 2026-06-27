@@ -1,4 +1,4 @@
-/* mtzHRF — Nav unificada + gestão de tema
+/* mtzRF — Nav unificada + gestão de tema
    Injeta #srf-nav em todas as páginas.
    Expõe: window.srfNav.setWs(bool), window.srfNav.setHrf(bool)
 */
@@ -71,7 +71,7 @@
     const title = t === 'neutral' ? 'Mudar para tema preto' : 'Mudar para tema neutro';
 
     return `
-      <a class="srf-logo" href="/">mtz<span>HRF</span></a>
+      <a class="srf-logo" href="/">mtz<span>RF</span></a>
       <nav class="srf-links">${links}</nav>
       <div class="srf-right">
         <button class="srf-hk start" id="srfHkStart" title="Para o HackRF e inicia o processo desta página">▶ START</button>
@@ -80,7 +80,7 @@
           <span class="srf-ws-dot" id="srfWsDot"></span>
           <span id="srfWsLbl">OFF</span>
         </div>
-        <span class="srf-hrf" id="srfHrfBadge">HRF —</span>
+        <span class="srf-hrf" id="srfHrfBadge">RF —</span>
         <button class="srf-theme" id="srfThemeBtn" title="${title}">${icon}</button>
       </div>`;
   }
@@ -161,7 +161,7 @@
     setHrf(on) {
       const b = document.getElementById('srfHrfBadge');
       if (!b) return;
-      b.textContent = on ? 'HRF: ATIVO' : 'HRF —';
+      b.textContent = on ? 'RF: ATIVO' : 'RF —';
       b.className   = 'srf-hrf' + (on ? ' on' : '');
     },
   };

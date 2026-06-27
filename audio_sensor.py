@@ -1,5 +1,5 @@
 """
-SinalRF — Sensor de Áudio
+mtzRF — Sensor de Áudio
 Detecta respiração e batimentos cardíacos via microfone.
 Funciona com microfone do Mac ou AirPods Pro (automático).
 """
@@ -238,7 +238,7 @@ class SensorAudio:
 
 # ─── Teste independente ────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("\n📡 SinalRF — Teste de Áudio\n")
+    print("\n📡 mtzRF — Teste de Áudio\n")
     s = SensorAudio()
     s.iniciar()
     print("Capturando… (Ctrl+C para parar)\n")

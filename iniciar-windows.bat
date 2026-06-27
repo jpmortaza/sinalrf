@@ -1,6 +1,6 @@
 @echo off
 REM ---------------------------------------------------------------
-REM  SINALRF - Launcher para Windows
+REM  MTZRF - Launcher para Windows
 REM  Duplo clique para iniciar o servidor.
 REM ---------------------------------------------------------------
 setlocal
@@ -18,7 +18,7 @@ if exist "%HACKRF_BIN%\hackrf_info.exe" set "PATH=%HACKRF_BIN%;%PATH%"
 
 echo.
 echo   ==============================================
-echo      SINALRF - Plataforma RF + HackRF + Audio
+echo      MTZRF - Plataforma RF + HackRF + Audio
 echo   ==============================================
 echo.
 echo   Dashboard:  http://localhost:8765
@@ -51,8 +51,13 @@ where hackrf_info >nul 2>&1 && (
 )
 
 echo.
-echo   [run] Iniciando servidor...
+echo   [run] Iniciando servidor e abrindo o mtzRF (janela dedicada)...
 echo.
+
+REM Abre a interface como app dedicado assim que o servidor responder.
+start "" powershell -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File "%~dp0abrir-app.ps1"
+
+REM Servidor roda neste console (backend do "sistema embarcado"). Ctrl+C para parar.
 ".venv\Scripts\python.exe" server.py
 
 endlocal

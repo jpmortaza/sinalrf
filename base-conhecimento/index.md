@@ -1,4 +1,4 @@
-# Base de Conhecimento — mtzHRF
+# Base de Conhecimento — mtzRF
 
 > Documentação de domínio, regras técnicas e decisões arquiteturais.
 > Um arquivo por módulo/tema. Documente aqui qualquer regra descoberta durante o desenvolvimento.

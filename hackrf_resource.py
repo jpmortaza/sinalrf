@@ -1,5 +1,5 @@
 """
-mtzHRF — HackRF Resource Manager
+mtzRF — HackRF Resource Manager
 ===================================
 Garante acesso EXCLUSIVO ao HackRF One: apenas um processo usa o
 dispositivo de cada vez. Qualquer chamada a hackrf_transfer,

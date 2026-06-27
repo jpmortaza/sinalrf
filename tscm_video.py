@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SinalRF — Decode de vídeo analógico (TSCM Fase 2)
+mtzRF — Decode de vídeo analógico (TSCM Fase 2)
 ==================================================
 Tenta reconstruir a imagem de uma câmera analógica sem fio (FPV/espiã) que
 transmite vídeo composto (CVBS, NTSC ou PAL) por FM nas bandas de 1.2 / 2.4 / 5.8 GHz.

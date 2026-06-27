@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SinalRF — TSCM Scanner (contra-vigilância)
+mtzRF — TSCM Scanner (contra-vigilância)
 ==========================================
 Varre faixas usadas por escutas (microfones sem fio, transmissores FM/NFM) e
 câmeras espiãs (1.2 / 2.4 / 5.8 GHz), detecta transmissões ativas, estima a

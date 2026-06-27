@@ -1,5 +1,5 @@
 """
-SinalRF — IMSI / TMSI Scanner (Passivo)
+mtzRF — IMSI / TMSI Scanner (Passivo)
 Detecta torres GSM com hackrf_sweep e captura identidades via gr-gsm.
 
 AVISO LEGAL: Uso exclusivamente educacional / pesquisa.

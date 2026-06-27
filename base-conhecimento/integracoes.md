@@ -1,4 +1,4 @@
-# Integrações — mtzHRF
+# Integrações — mtzRF
 
 > NUNCA escreva valores de chaves ou senhas aqui — apenas onde ficam guardadas.
 

@@ -1,5 +1,5 @@
 """
-SinalRF — Sensor HackRF One
+mtzRF — Sensor HackRF One
 Dois modos:
   1. Scanner de canais WiFi 2.4 GHz (potência por canal)
   2. Detector Doppler: captura variações de magnitude a 2.437 GHz
@@ -271,7 +271,7 @@ class SensorHackRF:
 
 # ─── Teste ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("\n📻 SinalRF — Teste HackRF (scan + doppler)\n")
+    print("\n📻 mtzRF — Teste HackRF (scan + doppler)\n")
     s = SensorHackRF()
     if s.conectado:
         s.iniciar()

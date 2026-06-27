@@ -1,5 +1,5 @@
 """
-mtzHRF — LLM Local Client (Ollama / LM Studio)
+mtzRF — LLM Local Client (Ollama / LM Studio)
 ================================================
 Integra o LLM local com os dados RF em tempo real.
 

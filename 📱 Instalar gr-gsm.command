@@ -1,6 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  SinalRF — Instalador de gr-gsm para macOS (arm64 / Apple Silicon)
+#  mtzRF — Instalador de gr-gsm para macOS (arm64 / Apple Silicon)
 #  Duplo clique para rodar. Pode pedir senha de admin (sudo make install).
 #  Tempo estimado: 5–10 min.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -595,7 +595,7 @@ echo -e "  ${G}🎉  INSTALAÇÃO CONCLUÍDA!${N}"
 echo ""
 echo "  Próximos passos:"
 echo "  1. Feche esta janela"
-echo "  2. Abra  👉  '🚀 Iniciar SinalRF.command'"
+echo "  2. Abra  👉  '🚀 Iniciar mtzRF.command'"
 echo "  3. Acesse http://localhost:8765/imsi-catcher.html"
 echo "  4. Clique 'Varrer Bandas' → selecione torre → 'Iniciar Captura'"
 echo ""

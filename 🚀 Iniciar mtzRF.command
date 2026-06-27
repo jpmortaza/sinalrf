@@ -1,6 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────
-#  SINALRF — Launcher
+#  MTZRF — Launcher
 #  Duplo clique no Finder para iniciar o servidor.
 # ─────────────────────────────────────────────────────
 

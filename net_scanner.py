@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SinalRF — Scanner de rede (câmeras WiFi/IP)
+mtzRF — Scanner de rede (câmeras WiFi/IP)
 ============================================
 Descobre os dispositivos na MESMA rede que o PC e identifica câmeras IP/WiFi,
 mostrando IP, MAC, fabricante, hostname e portas de câmera abertas (RTSP/ONVIF).

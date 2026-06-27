@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mtzHRF — Plataforma de Sensoriamento RF + Áudio
+mtzRF — Plataforma de Sensoriamento RF + Áudio
 WiFi RSSI · HackRF Espectro · Doppler Corporal · Radar Acústico
 """
 
@@ -1975,7 +1975,7 @@ app.mount("/", StaticFiles(directory=str(UI_PATH), html=True), name="ui")
 
 if __name__ == "__main__":
     print()
-    print("  📡  mtzHRF — Plataforma RF + Áudio + HackRF")
+    print("  📡  mtzRF — Plataforma RF + Áudio + HackRF")
     print(f"  🌐  http://localhost:{PORTA}")
     print(f"  ℹ️   HackRF: scan 2.4GHz + doppler + espectro 88-900MHz")
     print()

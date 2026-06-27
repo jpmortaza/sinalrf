@@ -1,5 +1,5 @@
 """
-SinalRF — Scanner de Inteligência Espectral
+mtzRF — Scanner de Inteligência Espectral
 Varre 1 MHz – 6 GHz com hackrf_sweep.
 Descobre, classifica e rastreia sinais automaticamente.
 Persistência, baseline adaptativo, feed de descobertas.
@@ -418,7 +418,7 @@ class ScannerInteligente:
 
 # ── Teste independente ─────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("\n🌌 SinalRF — Teste Intel Scanner\n")
+    print("\n🌌 mtzRF — Teste Intel Scanner\n")
     s = ScannerInteligente()
     if s.conectado:
         s.iniciar()

@@ -1,4 +1,4 @@
-# Sensores — mtzHRF
+# Sensores — mtzRF
 
 ## SensorHackRF (`hackrf_sensor.py`)
 

@@ -1,4 +1,4 @@
-# CLAUDE.md — mtzHRF / HackRF Platform
+# CLAUDE.md — mtzRF / HackRF Platform
 
 **GitHub:** https://github.com/jpmortaza/sinalrf
 
@@ -244,7 +244,7 @@ drawAntenna()        → mastro central (HackRF One)
 ```bash
 cd /Users/jeanmortaza/Documents/#all/dev/hackRF
 uv run python server.py
-# ou: duplo clique em "🚀 Iniciar mtzHRF.command"
+# ou: duplo clique em "🚀 Iniciar mtzRF.command"
 ```
 
 ### Portas

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SinalRF — WiFi Red Team (testes autorizados)
+mtzRF — WiFi Red Team (testes autorizados)
 =============================================
 Ferramentas de teste de segurança WiFi para engajamentos AUTORIZADOS:
 
