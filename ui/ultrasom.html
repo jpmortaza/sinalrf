@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // Monitor Ultrassônico</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    body { overflow-x:hidden; }
+    .us-wrap { padding:14px 18px; max-width:1280px; }
+    .us-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+    .us-head h1 { font-size:18px; letter-spacing:1px; margin:0; }
+    .us-head .sub { font-size:11px; color:var(--g3); }
+    .us-note { font-size:11px; color:var(--g3); line-height:1.6; background:var(--bg2);
+      border:1px solid var(--border); border-left:3px solid var(--y); padding:8px 12px;
+      margin:8px 0 14px; border-radius:4px; }
+    .us-note b { color:var(--g2); }
+
+    .us-status { display:flex; gap:16px; align-items:center; font-size:11px; color:var(--g3);
+      border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:12px; flex-wrap:wrap; }
+    .us-status b { color:var(--g); }
+    .us-dot { width:7px;height:7px;border-radius:50%;background:var(--g4);display:inline-block;margin-right:5px; }
+    .us-dot.on { background:var(--g); box-shadow:var(--glow-g); }
+    .jam { padding:2px 10px; border-radius:10px; font-weight:700; font-size:10px; letter-spacing:1px;
+      border:1px solid var(--border2); color:var(--g4); }
+    .jam.on { background:var(--r); color:#fff; border-color:var(--r); }
+
+    .us-grid { display:grid; grid-template-columns:1fr 320px; gap:14px; align-items:start; }
+    @media (max-width:900px){ .us-grid{ grid-template-columns:1fr; } }
+
+    .panel { border:1px solid var(--border); background:var(--bg2); border-radius:6px; padding:10px; }
+    .panel h2 { font-size:11px; letter-spacing:2px; color:var(--g3); margin:0 0 8px; }
+    canvas { display:block; width:100%; background:var(--bg); border-radius:4px; }
+    #spec { height:120px; margin-bottom:10px; }
+    #wf   { height:300px; }
+    .axis { display:flex; justify-content:space-between; font-size:9px; color:var(--g4); margin-top:3px; }
+
+    .tom { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:center;
+      padding:8px 10px; border:1px solid var(--border); background:var(--bg); border-radius:5px; margin-bottom:6px; }
+    .tom .f { font-size:15px; font-weight:700; color:var(--g); }
+    .tom .c { font-size:10px; color:var(--g4); margin-top:2px; }
+    .tom .lv { font-size:13px; font-weight:700; color:var(--y); text-align:right; }
+    .tom .pe { font-size:9px; color:var(--g4); text-align:right; }
+    .tom.beacon { border-left:3px solid var(--y); }
+    .tom.ultra  { border-left:3px solid var(--g); }
+    .empty { color:var(--g4); font-size:12px; padding:18px; text-align:center; }
+  </style>
+</head>
+<body>
+<script src="nav.js"></script>
+
+<div class="us-wrap">
+  <div class="us-head">
+    <h1>🔊 Monitor Ultrassônico</h1>
+    <span class="sub">TSCM por áudio · microfone do PC · não usa o HackRF</span>
+  </div>
+
+  <div class="us-note">
+    Vigia a banda <b>acima da voz humana</b> para achar o que o ouvido não pega:
+    <b>beacons de rastreamento</b> (18–20 kHz), <b>exfiltração de dados por som</b> e
+    <b>jammers ultrassônicos</b>. Honestidade: o que aparece <b>acima de ~20 kHz depende da
+    cápsula do microfone</b> — mics comuns rolam off em 16–20 kHz (faixa near-ultrassônica,
+    que já cobre os beacons). Para ultrassom pleno (>24 kHz) use um mic ultrassônico dedicado.
+  </div>
+
+  <div class="us-status">
+    <span><span class="us-dot" id="dot"></span><span id="conn">conectando…</span></span>
+    <span>dispositivo: <b id="dev">—</b></span>
+    <span>taxa: <b id="sr">—</b></span>
+    <span>Nyquist: <b id="nyq">—</b></span>
+    <span>piso: <b id="piso">—</b></span>
+    <span class="jam" id="jam">JAMMER: NÃO</span>
+    <span id="err" style="color:var(--r)"></span>
+  </div>
+
+  <div class="us-grid">
+    <div>
+      <div class="panel">
+        <h2>// ESPECTRO AO VIVO</h2>
+        <canvas id="spec"></canvas>
+        <div class="axis" id="axisTop"></div>
+        <h2 style="margin-top:12px">// WATERFALL (tempo ↓)</h2>
+        <canvas id="wf"></canvas>
+        <div class="axis" id="axisBot"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>// TONS SUSPEITOS (&gt; 17 kHz)</h2>
+      <div id="tons"><div class="empty">Nenhum tom acima de 17 kHz por enquanto.</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══ mtzRF — Monitor Ultrassônico ═══ */
+let _ws=null, _d=null, _nyq=null;
+
+function conectar(){
+  _ws = new WebSocket(`ws://${location.host}/ws/ultrassom`);
+  _ws.onopen  = ()=>{ if(window.srfNav) srfNav.setWs(true); setConn(true); };
+  _ws.onclose = ()=>{ if(window.srfNav) srfNav.setWs(false); setConn(false); setTimeout(conectar,2000); };
+  _ws.onmessage = ev=>{ try{ _d=JSON.parse(ev.data); render(_d); }catch{} };
+}
+function setConn(on){
+  document.getElementById('dot').className='us-dot'+(on?' on':'');
+  document.getElementById('conn').textContent = on?'capturando':'desconectado';
+}
+
+const spec=document.getElementById('spec'), sx=spec.getContext('2d');
+const wf=document.getElementById('wf'),   wx=wf.getContext('2d');
+function size(){ [spec,wf].forEach(c=>{ c.width=c.offsetWidth; c.height=c.clientHeight; }); }
+size(); window.addEventListener('resize', size);
+
+function corDb(norm){ // 0..1 -> azul->verde->amarelo->vermelho
+  const x=Math.max(0,Math.min(1,norm));
+  let r,g,b;
+  if(x<0.4){ r=0; g=Math.round(x/0.4*200); b=Math.round(120+x/0.4*135); }
+  else if(x<0.7){ const t=(x-0.4)/0.3; r=Math.round(t*230); g=200; b=Math.round(255*(1-t)); }
+  else { const t=(x-0.7)/0.3; r=230+Math.round(t*25); g=Math.round(200*(1-t)); b=0; }
+  return `rgb(${r},${g},${b})`;
+}
+
+function render(d){
+  if(d.erro){ document.getElementById('err').textContent='⚠ '+d.erro; return; }
+  _nyq = d.nyquist;
+  document.getElementById('dev').textContent  = d.device||'—';
+  document.getElementById('sr').textContent   = d.sr? (d.sr/1000)+' kHz':'—';
+  document.getElementById('nyq').textContent  = d.nyquist? (d.nyquist/1000)+' kHz':'—';
+  document.getElementById('piso').textContent = d.piso_db!=null? d.piso_db+' dB':'—';
+  const jam=document.getElementById('jam');
+  jam.textContent = 'JAMMER: '+(d.jammer?'SIM ⚠':'NÃO');
+  jam.className = 'jam'+(d.jammer?' on':'');
+
+  desenharEixos();
+  const esp=d.espectro||[];
+  if(esp.length){ desenharSpec(esp,d.piso_db); empurrarWaterfall(esp,d.piso_db); }
+
+  // lista de tons
+  const tons=d.tons||[];
+  const box=document.getElementById('tons');
+  if(!tons.length){ box.innerHTML='<div class="empty">Nenhum tom acima de 17 kHz por enquanto.</div>'; }
+  else {
+    box.innerHTML = tons.map(t=>{
+      const cls = t.freq_hz<20000 ? 'beacon' : 'ultra';
+      return `<div class="tom ${cls}">
+        <div>
+          <div class="f">${t.freq_khz.toFixed(2)} kHz</div>
+          <div class="c">${t.classe} · visto há ${t.idade}s</div>
+        </div>
+        <div>
+          <div class="lv">+${t.nivel_db} dB</div>
+          <div class="pe">persist. ${t.persistencia}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function desenharSpec(esp, piso){
+  const W=spec.width, H=spec.height;
+  sx.clearRect(0,0,W,H);
+  const lo=piso, hi=piso+70;
+  // linha de 20 kHz (limite audível)
+  if(_nyq){
+    const x20=20000/_nyq*W;
+    sx.strokeStyle='rgba(245,216,0,.35)'; sx.lineWidth=1; sx.setLineDash([4,4]);
+    sx.beginPath(); sx.moveTo(x20,0); sx.lineTo(x20,H); sx.stroke(); sx.setLineDash([]);
+  }
+  sx.beginPath();
+  esp.forEach((v,i)=>{
+    const x=i/(esp.length-1)*W;
+    const y=H - Math.max(0,Math.min(1,(v-lo)/(hi-lo)))*H;
+    i?sx.lineTo(x,y):sx.moveTo(x,y);
+  });
+  sx.strokeStyle='#47DF7F'; sx.lineWidth=1.4; sx.shadowColor='#47DF7F'; sx.shadowBlur=4;
+  sx.stroke(); sx.shadowBlur=0;
+}
+
+function empurrarWaterfall(esp, piso){
+  const W=wf.width, H=wf.height;
+  // rola 1px p/ baixo
+  wx.drawImage(wf, 0,0,W,H-1, 0,1,W,H-1);
+  const lo=piso, hi=piso+70;
+  for(let x=0;x<W;x++){
+    const i=Math.floor(x/W*esp.length);
+    const norm=(esp[i]-lo)/(hi-lo);
+    wx.fillStyle=corDb(norm);
+    wx.fillRect(x,0,1,1);
+  }
+}
+
+function desenharEixos(){
+  if(!_nyq) return;
+  const mk=(el)=>{
+    const n=_nyq/1000;
+    el.innerHTML=[0,0.25,0.5,0.75,1].map(f=>`<span>${Math.round(n*f)}k</span>`).join('');
+  };
+  mk(document.getElementById('axisTop'));
+  mk(document.getElementById('axisBot'));
+}
+
+conectar();
+</script>
+</body>
+</html>

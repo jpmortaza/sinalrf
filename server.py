@@ -59,6 +59,7 @@ import burst_hunter
 import adsb_scanner
 import ism_decoder
 import ble_scanner
+import ultrasonic_sensor
 try:
     import llm_client
     _LLM_OK = True
@@ -585,10 +586,12 @@ sensor_imsi      = ScannerIMSI(
 )
 sensor_adsb      = adsb_scanner.ADSB()
 localizador_ble  = ble_scanner.LocalizadorBLE()
+monitor_us       = ultrasonic_sensor.MonitorUltrassom()
 clientes: set[WebSocket] = set()
 clientes_intel: set[WebSocket] = set()
 clientes_imsi:  set[WebSocket] = set()
 clientes_ble:   set[WebSocket] = set()
+clientes_us:    set[WebSocket] = set()
 
 
 # ─── Loop de captura: lê RSSI a cada 100ms (binário Swift = 12ms) ─────────────
@@ -668,6 +671,7 @@ async def lifespan(_app: FastAPI):
     sensor_imsi.parar_captura()
     sensor_adsb.parar()
     localizador_ble.parar()
+    monitor_us.parar()
 
 
 # ─── App ──────────────────────────────────────────────────────────────────────
@@ -993,6 +997,38 @@ async def api_ble_stop():
     """Para o scan BLE e libera o rádio Bluetooth."""
     localizador_ble.parar()
     return {"ok": True}
+
+
+# ─── Monitor Ultrassônico (TSCM por áudio) ────────────────────────────────────
+@app.websocket("/ws/ultrassom")
+async def ws_ultrassom(ws: WebSocket):
+    """Espectro ultrassônico ao vivo + tons suspeitos (beacons/exfil/jammer).
+    Usa o microfone do PC (NÃO o HackRF). Empurra estado() a ~10 Hz."""
+    await ws.accept()
+    if not monitor_us.disponivel:
+        await ws.send_text(json.dumps(
+            {"erro": "áudio/sounddevice indisponível: " + (monitor_us.erro or "?")}))
+        await ws.close(); return
+
+    clientes_us.add(ws)
+    monitor_us.iniciar()
+    try:
+        while True:
+            await ws.send_text(json.dumps(monitor_us.estado(), ensure_ascii=False))
+            await asyncio.sleep(0.1)   # 10 Hz
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        clientes_us.discard(ws)
+        if not clientes_us:           # libera o microfone quando ninguém olha
+            monitor_us.parar()
+
+
+@app.get("/api/ultrassom")
+async def api_ultrassom():
+    """Snapshot do monitor ultrassônico (inicia a captura sob demanda)."""
+    monitor_us.iniciar()
+    return monitor_us.estado()
 
 
 # ─── Inteligência Espectral ───────────────────────────────────────────────────

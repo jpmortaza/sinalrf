@@ -16,6 +16,7 @@
       { href: '/burst.html',     label: 'Burst Hunter',      icon: '💥' },
       { href: '/sonda.html',     label: 'Sonda',             icon: '🔎' },
       { href: '/pessoas.html',   label: 'Localizar Pessoas', icon: '🎯' },
+      { href: '/ultrasom.html',  label: 'Ultrassom',         icon: '🔊' },
       { href: '/scanner.html',   label: 'Scanner',           icon: '🌌' },
     ]},
     { g: 'Decodificar', itens: [
@@ -49,7 +50,7 @@
     '/radio.html': 'radio', '/scanner.html': 'scanner', '/analista.html': 'tscm',
     '/sentinela.html': 'scanner', '/burst.html': 'tscm', '/sonda.html': 'tscm',
     '/adsb.html': 'idle', '/ism.html': 'tscm', '/rede.html': 'idle', '/wifi.html': 'idle',
-    '/pessoas.html': 'idle',
+    '/pessoas.html': 'idle', '/ultrasom.html': 'idle',
     '/historico.html': 'idle', '/alertas.html': 'idle', '/gps.html': 'gps',
     '/3d.html': 'completo', '/doppler.html': 'doppler', '/health.html': 'completo',
     '/intercept.html': 'imsi', '/emergencia.html': 'emergencia',
