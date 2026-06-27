@@ -56,6 +56,7 @@ import agendador
 import gps_monitor
 import sentinela
 import burst_hunter
+import adsb_scanner
 try:
     import llm_client
     _LLM_OK = True
@@ -583,6 +584,7 @@ sensor_imsi      = ScannerIMSI(
     sensor_espectro=sensor_espectro,
     sensor_intel=sensor_intel,
 )
+sensor_adsb      = adsb_scanner.ADSB()
 clientes: set[WebSocket] = set()
 clientes_intel: set[WebSocket] = set()
 clientes_imsi:  set[WebSocket] = set()
@@ -663,6 +665,7 @@ async def lifespan(_app: FastAPI):
     sensor_espectro.parar()
     sensor_intel.parar()
     sensor_imsi.parar_captura()
+    sensor_adsb.parar()
 
 
 # ─── App ──────────────────────────────────────────────────────────────────────
@@ -1235,6 +1238,25 @@ async def burst_cacar(body: dict):
     sensor_hackrf.pausar(); sensor_espectro.pausar(); sensor_intel.pausar()
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, lambda: burst_hunter.cacar(freq, sr, dur, 32, 40, amp))
+
+
+# ─── ADS-B — radar de aviões 1090 MHz (RX) ────────────────────────────────────
+@app.post("/api/adsb/start")
+async def adsb_start():
+    _parar_tudo_hackrf()          # libera o HackRF p/ o ADS-B
+    sensor_adsb.iniciar()
+    return {"ok": sensor_adsb.rodando, "pyModeS": adsb_scanner.PMS_OK}
+
+
+@app.post("/api/adsb/stop")
+async def adsb_stop():
+    sensor_adsb.parar()
+    return {"ok": True}
+
+
+@app.get("/api/adsb")
+async def adsb_estado():
+    return sensor_adsb.estado()
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────
@@ -2142,6 +2164,8 @@ def _parar_tudo_hackrf():
         _emergencia["_parar"].set()
     hackrf_resource.zerar()
     try: sensor_imsi.parar_captura()
+    except Exception: pass
+    try: sensor_adsb.parar()
     except Exception: pass
     sensor_hackrf.pausar()
     sensor_espectro.pausar()

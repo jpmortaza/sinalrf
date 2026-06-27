@@ -146,6 +146,7 @@ Com o servidor no ar, acesse: **http://localhost:8765**
 | `/sentinela.html` | **Sentinela (inteligência RF)** — baseline por local, comparação de anomalias e monitoramento 24/7 com alertas |
 | `/burst.html` | **Burst Hunter** — caça transmissores intermitentes/rajada (VOX, GSM, gravadores) via espectrograma |
 | `/sonda.html` | **Sonda Near-Field** — localizador físico por RSSI + tom de áudio (hot/cold) para achar o transmissor |
+| `/adsb.html` | **Aviões (ADS-B)** — radar passivo 1090 MHz: decodifica e plota aeronaves ao vivo num mapa (precisa de antena 1090) |
 | `/rede.html` | **Câmeras IP/WiFi** — escaneia a rede e lista dispositivos/câmeras (IP, MAC, fabricante, portas) |
 | `/wifi.html` | **WiFi Red Team** — adaptadores, recon WiFi, detecção de rogue AP e portal de conscientização (uso autorizado) |
 | `/3d.html` | Ambiente RF 3D |

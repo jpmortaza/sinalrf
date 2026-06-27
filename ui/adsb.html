@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // AVIÕES (ADS-B)</title>
+  <link rel="stylesheet" href="themes.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    .wrap{max-width:1280px;margin:0 auto;padding:16px 20px 60px}
+    .hdr{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px}
+    .hdr h1{font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:var(--glow-g)}
+    .hdr .sub{color:var(--g3);font-size:11px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:14px}
+    .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .btn{padding:9px 16px;border-radius:4px;border:1px solid var(--border2);background:var(--g4);color:var(--g);cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:1px}
+    .btn.on{background:var(--g);color:#000} .btn.stop{background:var(--r2);border-color:var(--r);color:var(--r)}
+    .st{font-size:11px;color:var(--g3)} .st.ok{color:var(--g)} .st.err{color:var(--r)}
+    #map{height:460px;border-radius:6px;border:1px solid var(--border)}
+    .plane{font-size:20px;line-height:1;filter:drop-shadow(0 0 2px #000);transition:transform .3s}
+    .lbl{font-size:9px;background:rgba(0,0,0,.55);color:#fff;padding:0 3px;border-radius:3px;white-space:nowrap}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{text-align:left;color:var(--g3);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border2);letter-spacing:1px}
+    td{padding:6px 8px;border-bottom:1px solid var(--border)}
+    tr:hover td{background:var(--bg3)}
+    .grid{display:flex;gap:22px;flex-wrap:wrap;font-size:12px} .grid b{color:var(--g);font-size:18px} .grid span{color:var(--g3)}
+    .empty{color:var(--g3);text-align:center;padding:18px;font-size:11px}
+    .legend{color:var(--g3);font-size:10px;margin-top:8px;line-height:1.6}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>✈️ AVIÕES — RADAR ADS-B</h1>
+      <span class="sub">recepção passiva 1090 MHz · decodifica e plota aeronaves ao vivo (100% legal)</span>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn" id="goBtn" onclick="toggle()">▶ ligar radar</button>
+        <div class="grid" id="stats"></div>
+        <span class="st" id="st" style="margin-left:auto">desligado</span>
+      </div>
+      <div id="map"></div>
+      <div class="legend">Aeronaves aparecem conforme transmitem. Posição precisa de um par de quadros par/ímpar (alguns segundos). Antena melhor em 1090 MHz = mais alcance. ⚠ Se o mapa não carregar (offline), os dados ainda aparecem na tabela.</div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:11px;letter-spacing:2px;color:var(--g2);margin-bottom:10px">Aeronaves <span class="st" id="nAv"></span></h2>
+      <div id="tab"><div class="empty">Ligue o radar.</div></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    const $=id=>document.getElementById(id);
+    let on=false, timer=null, map=null, markers={}, fitDone=false;
+
+    function initMap(){
+      if(map) return;
+      map=L.map('map',{zoomControl:true}).setView([-15.78,-47.93],4); // Brasil
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {maxZoom:18, attribution:'© OpenStreetMap'}).addTo(map);
+    }
+    function setSt(t,c){ $('st').textContent=t; $('st').className='st '+(c||''); }
+
+    async function toggle(){
+      if(on){ await fetch('/api/adsb/stop',{method:'POST'}); on=false; clearInterval(timer);
+        $('goBtn').textContent='▶ ligar radar'; $('goBtn').classList.remove('on'); setSt('desligado'); return; }
+      setSt('ligando o radar…','');
+      const d=await (await fetch('/api/adsb/start',{method:'POST'})).json();
+      if(!d.pyModeS){ setSt('⚠ pyModeS não instalado','err'); return; }
+      on=true; $('goBtn').textContent='■ desligar'; $('goBtn').classList.add('on');
+      initMap(); fitDone=false; poll(); timer=setInterval(poll,2000);
+    }
+
+    async function poll(){
+      try{
+        const d=await (await fetch('/api/adsb')).json();
+        $('stats').innerHTML=`<div><b>${d.n_avioes}</b> <span>aeronaves</span></div>`+
+          `<div><b>${d.n_com_pos}</b> <span>com posição</span></div>`+
+          `<div><b>${d.n_msgs}</b> <span>mensagens</span></div>`+
+          `<div><b>${d.n_sweeps}</b> <span>capturas</span></div>`;
+        setSt(d.n_avioes?`● ${d.n_avioes} aeronave(s)`:'ouvindo… (precisa de antena 1090 e aviões no alcance)', d.n_avioes?'ok':'');
+        atualizaMapa(d.avioes||[]);
+        tabela(d.avioes||[]);
+      }catch{}
+    }
+    function atualizaMapa(av){
+      if(!map) return;
+      const vivos=new Set();
+      const pts=[];
+      av.forEach(a=>{
+        if(a.lat==null) return;
+        vivos.add(a.icao); pts.push([a.lat,a.lon]);
+        const rot=(a.trk||0)-45;
+        const html=`<div style="text-align:center"><div class="plane" style="transform:rotate(${rot}deg)">✈️</div><div class="lbl">${a.callsign||a.icao}</div></div>`;
+        const ic=L.divIcon({html, className:'', iconSize:[60,34], iconAnchor:[30,17]});
+        if(markers[a.icao]){ markers[a.icao].setLatLng([a.lat,a.lon]).setIcon(ic); }
+        else { markers[a.icao]=L.marker([a.lat,a.lon],{icon:ic}).addTo(map); }
+        markers[a.icao].bindTooltip(`${a.callsign||a.icao} · ${a.alt??'?'} ft · ${a.spd??'?'} kt`,{direction:'top'});
+      });
+      Object.keys(markers).forEach(k=>{ if(!vivos.has(k)){ map.removeLayer(markers[k]); delete markers[k]; } });
+      if(!fitDone && pts.length){ map.fitBounds(pts,{padding:[40,40],maxZoom:9}); fitDone=true; }
+    }
+    function tabela(av){
+      $('nAv').textContent=`(${av.length})`;
+      if(!av.length){ $('tab').innerHTML='<div class="empty">Nenhuma aeronave ainda — depende de antena 1090 MHz e tráfego no alcance.</div>'; return; }
+      let h='<table><thead><tr><th>callsign</th><th>ICAO</th><th>alt (ft)</th><th>vel (kt)</th><th>rumo</th><th>posição</th><th>msgs</th></tr></thead><tbody>';
+      av.forEach(a=>{ h+=`<tr><td style="font-weight:700;color:var(--g)">${a.callsign||'—'}</td><td>${a.icao}</td>
+        <td>${a.alt??'—'}</td><td>${a.spd!=null?Math.round(a.spd):'—'}</td><td>${a.trk!=null?Math.round(a.trk)+'°':'—'}</td>
+        <td>${a.lat!=null?a.lat+', '+a.lon:'<span class="st">sem fix</span>'}</td><td>${a.msgs}</td></tr>`; });
+      $('tab').innerHTML=h+'</tbody></table>';
+    }
+    window.addEventListener('beforeunload',()=>{ if(on) navigator.sendBeacon?.('/api/adsb/stop'); });
+  </script>
+</body>
+</html>
