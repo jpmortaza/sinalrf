@@ -144,6 +144,7 @@ Com o servidor no ar, acesse: **http://localhost:8765**
 | `/scanner.html` | Scanner de espectro / inteligência |
 | `/analista.html` | **Analista de Espectro (TSCM)** — varre escutas/câmeras e escuta a transmissão |
 | `/sentinela.html` | **Sentinela (inteligência RF)** — baseline por local, comparação de anomalias e monitoramento 24/7 com alertas |
+| `/burst.html` | **Burst Hunter** — caça transmissores intermitentes/rajada (VOX, GSM, gravadores) via espectrograma |
 | `/rede.html` | **Câmeras IP/WiFi** — escaneia a rede e lista dispositivos/câmeras (IP, MAC, fabricante, portas) |
 | `/wifi.html` | **WiFi Red Team** — adaptadores, recon WiFi, detecção de rogue AP e portal de conscientização (uso autorizado) |
 | `/3d.html` | Ambiente RF 3D |

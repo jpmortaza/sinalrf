@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // BURST HUNTER</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap{max-width:1100px;margin:0 auto;padding:16px 20px 60px}
+    .hdr{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px}
+    .hdr h1{font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:var(--glow-g)}
+    .hdr .sub{color:var(--g3);font-size:11px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:14px}
+    .card h2{font-size:11px;letter-spacing:2px;color:var(--g2);margin-bottom:10px;text-transform:uppercase}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .btn{padding:9px 16px;border-radius:4px;border:1px solid var(--border2);background:var(--g4);color:var(--g);cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:1px}
+    .btn:hover:not(:disabled){background:var(--g3);box-shadow:var(--glow-g)} .btn:disabled{opacity:.4}
+    .preset{padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--g2);cursor:pointer;font-size:11px}
+    .preset:hover{border-color:var(--border2);color:var(--g)}
+    input,select{background:var(--bg);border:1px solid var(--border2);color:var(--g);padding:8px;border-radius:4px;font-family:var(--font);font-size:12px}
+    .st{font-size:11px;color:var(--g3)} .st.ok{color:var(--g)} .st.busy{color:var(--y)} .st.err{color:var(--r)}
+    canvas{display:block;width:100%;max-width:560px;image-rendering:pixelated;background:#000;border:1px solid var(--border);border-radius:4px;margin:0 auto}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{text-align:left;color:var(--g3);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border2);letter-spacing:1px}
+    td{padding:7px 8px;border-bottom:1px solid var(--border)}
+    tr:hover td{background:var(--bg3)}
+    .badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;background:var(--y2);color:#fff}
+    .empty{color:var(--g3);text-align:center;padding:20px;font-size:11px}
+    .legend{color:var(--g3);font-size:10px;margin-top:8px;line-height:1.6}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>💥 BURST HUNTER</h1>
+      <span class="sub">caça transmissores intermitentes (VOX, GSM em rajada, gravadores) que escapam do sweep</span>
+    </div>
+
+    <div class="card">
+      <h2>Captura</h2>
+      <div class="row" style="margin-bottom:8px">
+        <label class="st">centro <input id="freq" type="number" value="433.9" step="0.1" style="width:90px"> MHz</label>
+        <label class="st">span
+          <select id="sr"><option value="8000000">8 MHz</option><option value="10000000">10 MHz</option><option value="16000000">16 MHz</option><option value="20000000">20 MHz</option></select>
+        </label>
+        <label class="st">duração
+          <select id="dur"><option value="2">2 s</option><option value="3">3 s</option><option value="5">5 s</option></select>
+        </label>
+        <button class="btn" id="goBtn" onclick="cacar()">🎯 caçar rajadas</button>
+        <span class="st" id="st">aponte para uma banda suspeita e capture</span>
+      </div>
+      <div class="row">
+        <span class="st">presets:</span>
+        <span class="preset" onclick="setF(100)">FM 100</span>
+        <span class="preset" onclick="setF(150)">VHF 150</span>
+        <span class="preset" onclick="setF(433.9)">ISM 433</span>
+        <span class="preset" onclick="setF(868)">ISM 868</span>
+        <span class="preset" onclick="setF(915)">915</span>
+        <span class="preset" onclick="setF(940)">GSM 940</span>
+        <span class="preset" onclick="setF(2440)">2.4G 2440</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Waterfall (tempo ↓ × frequência →)</h2>
+      <canvas id="wf" width="256" height="256"></canvas>
+      <div class="legend">Listras <b>verticais contínuas</b> = transmissor sempre ligado. <b>Riscos curtos/intermitentes</b> = rajadas (o que procuramos). Centro tem um traço fixo (DC do rádio) — ignorado na detecção.</div>
+    </div>
+
+    <div class="card">
+      <h2>Rajadas detectadas <span class="st" id="nEv"></span></h2>
+      <div id="evs"><div class="empty">Nenhuma captura ainda.</div></div>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    const $=id=>document.getElementById(id);
+    function setF(v){ $('freq').value=v; }
+    function setSt(t,c){ $('st').textContent=t; $('st').className='st '+(c||''); }
+
+    async function cacar(){
+      const b=$('goBtn'); b.disabled=true;
+      const dur=$('dur').value;
+      setSt(`capturando ${dur}s e analisando…`,'busy');
+      try{
+        const d=await (await fetch('/api/burst/cacar',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({freq:+$('freq').value, sr:+$('sr').value, dur:+dur, amp:false})})).json();
+        if(!d.ok){ setSt('⚠ '+(d.motivo||'falha'),'err'); return; }
+        desenhar(d.waterfall);
+        setSt(`✓ ${d.n_eventos} rajada(s) em ${d.span_mhz} MHz @ ${d.freq_mhz} MHz`, d.n_eventos?'ok':'');
+        $('nEv').textContent=`(${d.n_eventos})`;
+        $('evs').innerHTML = d.eventos.length ? tabela(d.eventos)
+          : '<div class="empty">Nenhuma rajada — só sinais contínuos ou ruído nessa janela.</div>';
+      }catch(e){ setSt('⚠ '+e.message,'err'); } finally{ b.disabled=false; }
+    }
+    function tabela(ev){
+      let h='<table><thead><tr><th>freq</th><th>pico</th><th>largura</th><th>duração</th><th>duty</th><th>tipo</th></tr></thead><tbody>';
+      ev.forEach(x=>{ h+=`<tr><td style="font-weight:700;color:var(--g)">${x.freq_mhz} MHz <span class="st">(${x.off_khz>=0?'+':''}${x.off_khz}k)</span></td>
+        <td>${x.pico_db} dB</td><td>${x.bw_khz} kHz</td><td><span class="badge">${x.dur_ms} ms</span></td>
+        <td>${(x.duty*100).toFixed(0)}%</td><td class="st">${x.cat} · ${x.desc}</td></tr>`; });
+      return h+'</tbody></table>';
+    }
+    function desenhar(wf){
+      if(!wf||!wf.b64) return;
+      const bin=atob(wf.b64), cv=$('wf'); cv.width=wf.w; cv.height=wf.h;
+      const ctx=cv.getContext('2d'), img=ctx.createImageData(wf.w,wf.h);
+      for(let i=0;i<wf.w*wf.h;i++){ const g=bin.charCodeAt(i);
+        // paleta: preto->verde p/ destacar energia
+        img.data[i*4]=g*0.2; img.data[i*4+1]=g; img.data[i*4+2]=g*0.3; img.data[i*4+3]=255; }
+      ctx.putImageData(img,0,0);
+    }
+    fetch('/api/hackrf/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:'tscm'})}).catch(()=>{});
+  </script>
+</body>
+</html>

@@ -55,6 +55,7 @@ import historico
 import agendador
 import gps_monitor
 import sentinela
+import burst_hunter
 try:
     import llm_client
     _LLM_OK = True
@@ -1134,6 +1135,20 @@ async def gps_calibrar():
     sensor_hackrf.pausar(); sensor_espectro.pausar(); sensor_intel.pausar()
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, gps_monitor.calibrar)
+
+
+# ─── Burst Hunter — caçador de transmissores intermitentes (RX) ───────────────
+@app.post("/api/burst/cacar")
+async def burst_cacar(body: dict):
+    freq = float(body.get("freq", 0))
+    sr   = int(body.get("sr", 8_000_000))
+    dur  = float(body.get("dur", 2.0))
+    amp  = bool(body.get("amp", False))
+    if freq <= 0:
+        return {"ok": False, "motivo": "frequência inválida"}
+    sensor_hackrf.pausar(); sensor_espectro.pausar(); sensor_intel.pausar()
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, lambda: burst_hunter.cacar(freq, sr, dur, 32, 40, amp))
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────
