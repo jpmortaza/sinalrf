@@ -109,7 +109,9 @@ automaticamente pelo firmware do HackRF One — se não for, use o [Zadig](https
 para instalar o WinUSB no dispositivo. O `iniciar-windows.bat` já adiciona essa pasta ao PATH.
 
 > A interceptação IMSI depende de **gr-gsm**, que não roda no Windows. No Windows, as
-> funções de espectro, Doppler/WiFi e rádio FM funcionam; para IMSI use macOS/Linux.
+> funções de espectro, Doppler/WiFi e rádio FM funcionam; para IMSI use macOS/Linux —
+> ou rode o gr-gsm via **WSL2** seguindo [`docs/IMSI-WSL2-grgsm.md`](docs/IMSI-WSL2-grgsm.md)
+> (uso legal/autorizado apenas).
 
 ### macOS / Linux
 
