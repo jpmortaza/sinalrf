@@ -147,6 +147,7 @@ Com o servidor no ar, acesse: **http://localhost:8765**
 | `/burst.html` | **Burst Hunter** — caça transmissores intermitentes/rajada (VOX, GSM, gravadores) via espectrograma |
 | `/sonda.html` | **Sonda Near-Field** — localizador físico por RSSI + tom de áudio (hot/cold) para achar o transmissor |
 | `/adsb.html` | **Aviões (ADS-B)** — radar passivo 1090 MHz: decodifica e plota aeronaves ao vivo num mapa (precisa de antena 1090) |
+| `/ism.html` | **ISM/IoT (433/868)** — decodifica OOK/ASK de sensores, controles, campainhas e TPMS (payload bruto) |
 | `/rede.html` | **Câmeras IP/WiFi** — escaneia a rede e lista dispositivos/câmeras (IP, MAC, fabricante, portas) |
 | `/wifi.html` | **WiFi Red Team** — adaptadores, recon WiFi, detecção de rogue AP e portal de conscientização (uso autorizado) |
 | `/3d.html` | Ambiente RF 3D |

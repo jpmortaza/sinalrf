@@ -57,6 +57,7 @@ import gps_monitor
 import sentinela
 import burst_hunter
 import adsb_scanner
+import ism_decoder
 try:
     import llm_client
     _LLM_OK = True
@@ -1257,6 +1258,17 @@ async def adsb_stop():
 @app.get("/api/adsb")
 async def adsb_estado():
     return sensor_adsb.estado()
+
+
+# ─── ISM 433/868 — decoder OOK/ASK estilo rtl_433 (RX) ────────────────────────
+@app.post("/api/ism/scan")
+async def ism_scan(body: dict):
+    freq = float(body.get("freq", 433.92))
+    dur  = float(body.get("dur", 3.0))
+    amp  = bool(body.get("amp", True))
+    sensor_hackrf.pausar(); sensor_espectro.pausar(); sensor_intel.pausar()
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, lambda: ism_decoder.escanear(freq, dur, 32, 40, amp))
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────

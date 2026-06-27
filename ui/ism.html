@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // ISM / IoT</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
+    .hdr{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px}
+    .hdr h1{font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:var(--glow-g)}
+    .hdr .sub{color:var(--g3);font-size:11px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:14px}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .btn{padding:9px 16px;border-radius:4px;border:1px solid var(--border2);background:var(--g4);color:var(--g);cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:1px}
+    .btn:hover:not(:disabled){background:var(--g3)} .btn:disabled{opacity:.4}
+    .preset{padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--g2);cursor:pointer;font-size:11px}
+    .preset:hover{color:var(--g)}
+    input,select{background:var(--bg);border:1px solid var(--border2);color:var(--g);padding:8px;border-radius:4px;font-family:var(--font);font-size:12px}
+    .st{font-size:11px;color:var(--g3)} .st.ok{color:var(--g)} .st.busy{color:var(--y)} .st.err{color:var(--r)}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{text-align:left;color:var(--g3);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border2);letter-spacing:1px}
+    td{padding:7px 8px;border-bottom:1px solid var(--border)}
+    tr:hover td{background:var(--bg3)}
+    .hex{font-family:var(--font);color:var(--c);word-break:break-all}
+    .badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;background:var(--g4);color:var(--g2)}
+    .empty{color:var(--g3);text-align:center;padding:18px;font-size:11px}
+    .legend{color:var(--g3);font-size:10px;margin-top:8px;line-height:1.6}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>📟 ISM / IoT (OOK 433/868)</h1>
+      <span class="sub">decodifica sensores, controles, campainhas, estações meteo e TPMS de pneus</span>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:8px">
+        <label class="st">freq <input id="freq" type="number" value="433.92" step="0.01" style="width:90px"> MHz</label>
+        <label class="st">escuta <select id="dur"><option value="3">3 s</option><option value="5">5 s</option><option value="8">8 s</option></select></label>
+        <button class="btn" id="goBtn" onclick="scan()">📡 escutar / decodificar</button>
+        <span class="st" id="st">dica: aperte um controle/campainha durante a escuta</span>
+      </div>
+      <div class="row">
+        <span class="st">presets:</span>
+        <span class="preset" onclick="setF(433.92)">433.92 (BR/EU)</span>
+        <span class="preset" onclick="setF(315)">315 (US)</span>
+        <span class="preset" onclick="setF(868.3)">868.3 (EU)</span>
+        <span class="preset" onclick="setF(915)">915 (US/ISM)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:11px;letter-spacing:2px;color:var(--g2);margin-bottom:10px">Pacotes decodificados <span class="st" id="n"></span></h2>
+      <div id="out"><div class="empty">Nenhuma captura ainda.</div></div>
+      <div class="legend">Mostra o <b>payload bruto</b> (hex) e o timing (pulso curto/longo). Pacotes repetidos são agrupados (devices repetem). Não identifica o modelo exato — para isso, o rtl_433 tem decoders dedicados. Só recepção.</div>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    const $=id=>document.getElementById(id);
+    function setF(v){ $('freq').value=v; }
+    function setSt(t,c){ $('st').textContent=t; $('st').className='st '+(c||''); }
+    async function scan(){
+      const b=$('goBtn'); b.disabled=true; const dur=$('dur').value;
+      setSt(`escutando ${dur}s em ${$('freq').value} MHz…`,'busy');
+      try{
+        const d=await (await fetch('/api/ism/scan',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({freq:+$('freq').value, dur:+dur})})).json();
+        if(!d.ok){ setSt('⚠ '+(d.motivo||'falha'),'err'); return; }
+        $('n').textContent=`(${d.n_pacotes})`;
+        if(!d.n_pacotes){ $('out').innerHTML=`<div class="empty">${d.motivo||'Nenhum pacote OOK decodificado nessa janela.'}</div>`; setSt('✓ nada decodificado','ok'); return; }
+        let h='<table><thead><tr><th>payload (hex)</th><th>bits</th><th>pulsos</th><th>dur</th><th>curto/longo</th><th>repetições</th></tr></thead><tbody>';
+        d.pacotes.forEach(p=>{ h+=`<tr><td class="hex">${p.hex}</td><td>${p.bits}</td><td>${p.n_pulsos}</td><td>${p.dur_ms} ms</td>
+          <td class="st">${p.curto_us}/${p.longo_us} µs</td><td><span class="badge">×${p.rep}</span></td></tr>`; });
+        $('out').innerHTML=h+'</tbody></table>';
+        setSt(`✓ ${d.n_pacotes} pacote(s) decodificado(s)`,'ok');
+      }catch(e){ setSt('⚠ '+e.message,'err'); } finally{ b.disabled=false; }
+    }
+    fetch('/api/hackrf/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:'tscm'})}).catch(()=>{});
+  </script>
+</body>
+</html>
