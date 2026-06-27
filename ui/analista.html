@@ -94,6 +94,7 @@
         </label>
         <button class="btn sec" id="baseBtn" onclick="salvarBaseline()" title="Marca os sinais atuais como 'ambiente normal'. Na próxima varredura, sinais novos são destacados.">★ salvar baseline</button>
         <button class="btn sec" id="baseClr" onclick="limparBaseline()">limpar baseline</button>
+        <button class="btn sec" onclick="salvarHistorico()" title="Salva esta varredura no histórico (gera relatório depois)">💾 salvar no histórico</button>
         <span class="st" id="scanSt">Pronto.</span>
       </div>
     </div>
@@ -163,6 +164,14 @@
     const WS = `ws://${location.host}`;
     let bandaSel = 'audio';
     let ultimoSinais = [];
+    let ultimaVarredura = null;
+
+    async function salvarHistorico() {
+      if (!ultimaVarredura) { setSt('scanSt', 'varra primeiro para salvar', 'busy'); return; }
+      await fetch('/api/historico/salvar', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ tipo:'tscm', titulo:'TSCM '+bandaSel, dados: ultimaVarredura }) });
+      setSt('scanSt', '💾 salvo no histórico', 'ok');
+    }
 
     // ── Bandas ────────────────────────────────────────────────────────────────
     const BANDAS_FALLBACK = {
@@ -199,6 +208,7 @@
         const d = await r.json();
         if (!d.ok) { setSt('scanSt', '⚠ ' + (d.erro || 'falha'), 'err'); return; }
         ultimoSinais = d.sinais || [];
+        ultimaVarredura = d;
         render(d);
         const nNov = ultimoSinais.filter(s => s.novo).length;
         setSt('scanSt', `✓ ${d.n_sinais} sinais · piso ${d.piso_db} dBm` + (d.tem_baseline ? ` · ${nNov} NOVOS` : ''), 'ok');

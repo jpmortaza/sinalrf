@@ -55,6 +55,7 @@
       </div>
       <div class="row">
         <button class="btn" id="scanBtn" onclick="scan()">⟳ ESCANEAR REDE</button>
+        <button class="btn" onclick="salvarHistorico()" title="Salva esta varredura no histórico">💾 salvar</button>
         <span class="st" id="st">Pronto.</span>
       </div>
       <div class="legend">
@@ -90,6 +91,14 @@
 
     function setSt(t, c) { const e=document.getElementById('st'); e.textContent=t; e.className='st '+(c||''); }
 
+    let ultimaRede = null;
+    async function salvarHistorico() {
+      if (!ultimaRede) { setSt('escaneie primeiro para salvar', 'busy'); return; }
+      await fetch('/api/historico/salvar', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ tipo:'rede', titulo:'Câmeras IP / rede', dados: ultimaRede }) });
+      setSt('💾 salvo no histórico', 'ok');
+    }
+
     async function scan() {
       const btn = document.getElementById('scanBtn'); btn.disabled = true;
       setSt('escaneando a rede… (ping sweep + portas, ~10-40s)', 'busy');
@@ -97,6 +106,7 @@
         const r = await fetch('/api/rede/scan', { method:'POST' });
         const d = await r.json();
         if (!d.ok) { setSt('⚠ ' + (d.erro || 'falha'), 'err'); return; }
+        ultimaRede = d;
         render(d);
         setSt(`✓ ${d.n_dispositivos} dispositivos · ${d.n_cameras} câmera(s)`, 'ok');
       } catch (e) { setSt('⚠ erro: ' + e.message, 'err'); }

@@ -70,6 +70,7 @@
       <h2>2 · Recon WiFi + detecção de rogue AP</h2>
       <div class="row" style="margin-bottom:10px">
         <button class="btn" id="scanBtn" onclick="scan()">⟳ escanear redes</button>
+        <button class="btn sec" onclick="salvarHistorico()" title="Salva esta varredura no histórico">💾 salvar</button>
         <span class="st" id="scanSt">—</span>
       </div>
       <div id="rogue"></div>
@@ -132,6 +133,14 @@
     }
 
     // ── Recon ────────────────────────────────────────────────────────────────
+    let ultimaWifi = null;
+    async function salvarHistorico(){
+      if(!ultimaWifi){ setSt('scanSt','escaneie primeiro para salvar','busy'); return; }
+      await fetch('/api/historico/salvar',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({tipo:'wifi',titulo:'WiFi recon',dados:ultimaWifi})});
+      setSt('scanSt','💾 salvo no histórico','ok');
+    }
+
     async function scan(){
       const b=document.getElementById('scanBtn');b.disabled=true;
       setSt('scanSt','escaneando…','busy');
@@ -139,6 +148,7 @@
         const d=await (await fetch('/api/wifi/scan',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({interface:ifaceSel})})).json();
         showAcesso(d.acesso);
+        ultimaWifi = d;
         renderRogue(d.rogue||[]);
         renderRedes(d.redes||[]);
         setSt('scanSt',`✓ ${d.n} APs · ${(d.rogue||[]).length} alerta(s)`,'ok');

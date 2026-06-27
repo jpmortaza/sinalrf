@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // HISTÓRICO</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap{max-width:1100px;margin:0 auto;padding:16px 20px 60px}
+    .hdr{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px}
+    .hdr h1{font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:var(--glow-g)}
+    .hdr .sub{color:var(--g3);font-size:11px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{text-align:left;color:var(--g3);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border2);letter-spacing:1px}
+    td{padding:8px;border-bottom:1px solid var(--border);vertical-align:middle}
+    tr:hover td{background:var(--bg3)}
+    .tipo{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;background:var(--g4);color:var(--g2)}
+    .btn{padding:5px 11px;border-radius:4px;border:1px solid var(--border2);background:var(--g4);color:var(--g);cursor:pointer;font-family:var(--font);font-size:11px;text-decoration:none;display:inline-block}
+    .btn:hover{background:var(--g3)}
+    .btn.del{background:var(--r2);border-color:var(--r);color:var(--r)}
+    .ts{color:var(--g3)} .resumo{color:var(--g2)}
+    .empty{color:var(--g3);text-align:center;padding:28px;font-size:11px}
+    .st{font-size:11px;color:var(--g3)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>🗂 HISTÓRICO</h1>
+      <span class="sub">varreduras salvas (TSCM, WiFi, câmeras) · gere relatórios imprimíveis</span>
+      <span class="st" id="st" style="margin-left:auto"></span>
+    </div>
+    <div class="card" id="lista"><div class="empty">Carregando…</div></div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    async function carregar(){
+      try{
+        const d = await (await fetch('/api/historico')).json();
+        const e = d.entradas || [];
+        document.getElementById('st').textContent = `${e.length} registros`;
+        if(!e.length){ document.getElementById('lista').innerHTML='<div class="empty">Nenhuma varredura salva ainda. Use o botão "💾 salvar no histórico" nas páginas de varredura.</div>'; return; }
+        let h='<table><thead><tr><th>data</th><th>tipo</th><th>título</th><th>resumo</th><th>ações</th></tr></thead><tbody>';
+        e.forEach(x=>{
+          h+=`<tr>
+            <td class="ts">${x.ts}</td>
+            <td><span class="tipo">${x.tipo}</span></td>
+            <td>${esc(x.titulo)}</td>
+            <td class="resumo">${esc(x.resumo||'')}</td>
+            <td>
+              <a class="btn" href="/relatorio/${x.id}" target="_blank">📄 relatório</a>
+              <button class="btn del" onclick="excluir('${x.id}')">excluir</button>
+            </td></tr>`;
+        });
+        document.getElementById('lista').innerHTML=h+'</tbody></table>';
+      }catch(err){ document.getElementById('lista').innerHTML='<div class="empty">erro ao carregar</div>'; }
+    }
+    function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+    async function excluir(id){
+      if(!confirm('Excluir esta varredura do histórico?')) return;
+      await fetch('/api/historico/'+id, {method:'DELETE'});
+      carregar();
+    }
+    carregar();
+  </script>
+</body>
+</html>

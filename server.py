@@ -37,7 +37,7 @@ except ImportError:
 import numpy as np
 from scipy import signal as sp_signal
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
@@ -51,6 +51,7 @@ import tscm_scanner
 import tscm_video
 import net_scanner
 import wifi_tools
+import historico
 try:
     import llm_client
     _LLM_OK = True
@@ -1018,6 +1019,39 @@ async def servir_portal(nome: str):
     if not arq.exists():
         raise HTTPException(404, "portal não encontrado")
     return FileResponse(arq)
+
+
+# ─── Histórico e Relatórios ───────────────────────────────────────────────────
+@app.post("/api/historico/salvar")
+async def historico_salvar(body: dict):
+    """Salva uma varredura no histórico. Body: { tipo, titulo, dados }"""
+    return historico.salvar(body.get("tipo", "scan"), body.get("titulo", ""), body.get("dados", {}))
+
+
+@app.get("/api/historico")
+async def historico_listar():
+    return {"entradas": historico.listar()}
+
+
+@app.get("/api/historico/{eid}")
+async def historico_obter(eid: str):
+    d = historico.obter(eid)
+    if not d:
+        raise HTTPException(404, "entrada não encontrada")
+    return d
+
+
+@app.delete("/api/historico/{eid}")
+async def historico_excluir(eid: str):
+    return {"ok": historico.excluir(eid)}
+
+
+@app.get("/relatorio/{eid}")
+async def relatorio(eid: str):
+    h = historico.relatorio_html(eid)
+    if not h:
+        raise HTTPException(404, "relatório não encontrado")
+    return HTMLResponse(h)
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────

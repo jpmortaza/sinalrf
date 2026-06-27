@@ -42,3 +42,7 @@ contatos_emergencia.json
 
 # Capturas do portal cativo (dados de teste — não commitar)
 capturas_portal.jsonl
+
+# Histórico de varreduras (dados locais)
+historico/
+abrir-app.log
