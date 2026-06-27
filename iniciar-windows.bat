@@ -51,14 +51,12 @@ where hackrf_info >nul 2>&1 && (
 )
 
 echo.
-echo   [run] Iniciando servidor e abrindo o mtzRF (janela dedicada)...
+echo   [run] Iniciando mtzRF em tela cheia (kiosk)...
+echo   Para sair: Alt + F4 na janela (encerra o servidor automaticamente).
 echo.
 
-REM Abre a interface como app dedicado assim que o servidor responder.
-start "" powershell -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File "%~dp0abrir-app.ps1"
-
-REM Servidor roda neste console (backend do "sistema embarcado"). Ctrl+C para parar.
-".venv\Scripts\python.exe" server.py
+REM Orquestrador: sobe o servidor (backend oculto), abre em kiosk e, ao fechar
+REM a janela, encerra o servidor. Este console fica minimizado durante o uso.
+powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0abrir-app.ps1"
 
 endlocal
-pause

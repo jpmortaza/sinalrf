@@ -87,6 +87,13 @@
 
   /* ── Inject ──────────────────────────────────────────────────── */
   function inject() {
+    // Ícone da janela/aba (mtzRF) em todas as páginas
+    if (!document.querySelector('link[rel="icon"]')) {
+      const ic = document.createElement('link');
+      ic.rel = 'icon'; ic.type = 'image/svg+xml'; ic.href = '/favicon.svg';
+      document.head.appendChild(ic);
+    }
+
     // Aplica o tema salvo antes de renderizar (evita flash)
     const saved = getTheme();
     if (saved === 'neutral') {
