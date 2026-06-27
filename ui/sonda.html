@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // SONDA</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap{max-width:760px;margin:0 auto;padding:16px 20px 60px}
+    .hdr{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px}
+    .hdr h1{font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:var(--glow-g)}
+    .hdr .sub{color:var(--g3);font-size:11px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:14px}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .btn{padding:9px 16px;border-radius:4px;border:1px solid var(--border2);background:var(--g4);color:var(--g);cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:1px}
+    .btn:hover:not(:disabled){background:var(--g3)} .btn.stop{background:var(--r2);border-color:var(--r);color:var(--r)}
+    input{background:var(--bg);border:1px solid var(--border2);color:var(--g);padding:8px;border-radius:4px;font-family:var(--font);font-size:12px}
+    .toggle{display:flex;align-items:center;gap:6px;color:var(--g2);cursor:pointer} .toggle input{accent-color:var(--g)}
+    .st{font-size:11px;color:var(--g3)} .st.ok{color:var(--g)} .st.busy{color:var(--y)} .st.err{color:var(--r)}
+    .meterWrap{text-align:center;padding:8px 0}
+    .rssiBig{font-size:64px;font-weight:800;letter-spacing:-1px;line-height:1;transition:color .1s}
+    .rssiU{font-size:14px;color:var(--g3)}
+    .bar{height:42px;border-radius:8px;background:var(--bg);border:1px solid var(--border);overflow:hidden;margin:14px 0;position:relative}
+    .bar > .fill{height:100%;width:0%;transition:width .08s, background .1s;border-radius:8px 0 0 8px}
+    .bar > .peak{position:absolute;top:0;bottom:0;width:3px;background:var(--g);box-shadow:0 0 8px var(--g)}
+    .hint{font-size:13px;text-align:center;color:var(--g2);min-height:18px}
+    canvas{display:block;width:100%;height:80px;background:var(--bg);border:1px solid var(--border);border-radius:4px;margin-top:8px}
+    .legend{color:var(--g3);font-size:10px;margin-top:8px;line-height:1.6}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>🔎 SONDA NEAR-FIELD</h1>
+      <span class="sub">localizador físico: aproxime a antena — quanto mais forte, mais agudo o tom</span>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:6px">
+        <label class="st">freq <input id="freq" type="number" value="433.9" step="0.1" style="width:100px"> MHz</label>
+        <button class="btn" id="goBtn" onclick="toggle()">▶ iniciar sonda</button>
+        <label class="toggle"><input type="checkbox" id="som" checked> som</label>
+        <button class="btn" onclick="zerar()" title="Define o nível atual como referência (fundo)">⌖ zerar fundo</button>
+        <span class="st" id="st">informe a frequência suspeita e inicie</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="meterWrap">
+        <span class="rssiBig" id="rssi">—</span><span class="rssiU"> dBFS</span>
+      </div>
+      <div class="bar"><div class="fill" id="fill"></div><div class="peak" id="peak" style="left:0%"></div></div>
+      <div class="hint" id="hint">—</div>
+      <canvas id="hist"></canvas>
+      <div class="legend">Use uma antena pequena/curta. Ande pelo ambiente: o valor sobe e o tom fica mais agudo perto do transmissor. "⌖ zerar fundo" calibra o nível ambiente — aí o medidor mostra o quanto você está acima dele.</div>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    const $=id=>document.getElementById(id);
+    let ws=null, on=false, ctx=null, osc=null, gain=null;
+    let lo=-70, hi=-10, peak=-120, ref=null;
+    let hist=new Float32Array(240).fill(-120);
+
+    // prefill freq de ?freq=
+    const qf=new URLSearchParams(location.search).get('freq'); if(qf) $('freq').value=qf;
+    function setSt(t,c){ $('st').textContent=t; $('st').className='st '+(c||''); }
+
+    function toggle(){ on?parar():iniciar(); }
+    function iniciar(){
+      const f=parseFloat($('freq').value); if(!f){ setSt('freq inválida','err'); return; }
+      lo=-70; hi=-10; peak=-120; hist.fill(-120);
+      ws=new WebSocket(`ws://${location.host}/ws/nearfield?freq=${f}`);
+      setSt('conectando…','busy');
+      ws.onmessage=ev=>{ const m=JSON.parse(ev.data);
+        if(m.erro){ setSt('⚠ '+m.erro,'err'); parar(); return; }
+        if(m.ok){ setSt(`▶ sondando ${m.freq_mhz} MHz`,'ok'); return; }
+        if(typeof m.rssi==='number') atualiza(m.rssi);
+      };
+      ws.onclose=()=>{ if(on) parar(); };
+      ws.onerror=()=>{ setSt('erro de conexão','err'); };
+      on=true; $('goBtn').textContent='■ parar'; $('goBtn').classList.add('stop');
+      if($('som').checked) audioOn();
+      requestAnimationFrame(desenha);
+    }
+    function parar(){
+      on=false; if(ws){ try{ws.send('STOP');ws.close();}catch{} ws=null; }
+      audioOff(); $('goBtn').textContent='▶ iniciar sonda'; $('goBtn').classList.remove('stop');
+    }
+    function zerar(){ ref = lastRssi; }
+
+    let lastRssi=-120;
+    function atualiza(rssi){
+      lastRssi=rssi;
+      // auto-range suave
+      lo=Math.min(lo, rssi-2)*0.999 + (rssi-30)*0.001;
+      hi=Math.max(hi, rssi+2);
+      peak=Math.max(peak, rssi);
+      const norm=Math.max(0,Math.min(1,(rssi-lo)/((hi-lo)||1)));
+      const pct=(norm*100).toFixed(0);
+      $('fill').style.width=pct+'%';
+      const cor=`hsl(${(1-norm)*140},85%,${document.documentElement.getAttribute('data-theme')==='neutral'?'42%':'55%'})`;
+      $('fill').style.background=cor; $('rssi').style.color=cor;
+      $('rssi').textContent=rssi.toFixed(1);
+      $('peak').style.left=Math.max(0,Math.min(100,((peak-lo)/((hi-lo)||1)*100)))+'%';
+      const acima = ref!=null ? (rssi-ref) : null;
+      $('hint').textContent = ref!=null
+        ? (acima>3 ? `🔥 ${acima.toFixed(0)} dB acima do fundo — está perto!` : (acima<-1?'❄️ abaixo do fundo':'~ no nível do fundo'))
+        : (norm>0.75?'🔥 forte — aproximando':norm<0.3?'❄️ fraco':'• sinal médio');
+      // tom: pitch sobe com norm
+      if(osc&&gain){ osc.frequency.value=220+norm*1100; gain.gain.value=0.06+norm*0.12; }
+      hist=new Float32Array([...hist.slice(1), rssi]);
+    }
+    function audioOn(){ try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); osc=ctx.createOscillator(); gain=ctx.createGain(); osc.type='sine'; gain.gain.value=0.05; osc.connect(gain); gain.connect(ctx.destination); osc.start(); }catch{} }
+    function audioOff(){ try{ if(osc)osc.stop(); if(ctx)ctx.close(); }catch{} osc=null;ctx=null;gain=null; }
+    $('som').addEventListener('change',()=>{ if(!on)return; $('som').checked?audioOn():audioOff(); });
+
+    function desenha(){
+      if(!on) return;
+      const cv=$('hist'); cv.width=cv.clientWidth; const c=cv.getContext('2d'),W=cv.width,H=cv.height; c.clearRect(0,0,W,H);
+      const mn=Math.min(...hist.filter(v=>v>-119),lo)-2, mx=Math.max(...hist,hi)+2;
+      c.strokeStyle='#2eb861'; c.lineWidth=1.4; c.beginPath();
+      hist.forEach((v,i)=>{ if(v<=-119)return; const x=i/hist.length*W, y=H-(v-mn)/((mx-mn)||1)*H; i?c.lineTo(x,y):c.moveTo(x,y); });
+      c.stroke();
+      requestAnimationFrame(desenha);
+    }
+    fetch('/api/hackrf/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:'tscm'})}).catch(()=>{});
+    window.addEventListener('beforeunload',parar);
+  </script>
+</body>
+</html>

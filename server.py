@@ -839,6 +839,92 @@ async def ws_radio(ws: WebSocket,
         sensor_intel.retomar()
 
 
+# ─── Sonda Near-Field (localizador físico por RSSI) ───────────────────────────
+@app.websocket("/ws/nearfield")
+async def ws_nearfield(ws: WebSocket,
+                       freq: float = Query(433.9),
+                       lna: int = Query(24),
+                       vga: int = Query(20)):
+    """Mede RSSI ao vivo numa frequência (ganhos FIXOS, sem AGC, p/ refletir distância).
+    Envia {rssi_dbfs, ts} ~25 Hz. O cliente faz o tom/medidor 'hot-cold'."""
+    await ws.accept()
+    if not _radio_lock.acquire(blocking=False):
+        await ws.send_text(json.dumps({"erro": "HackRF ocupado — pare outra atividade"}))
+        await ws.close(); return
+
+    hackrf_resource.zerar()
+    sensor_hackrf.pausar(); sensor_espectro.pausar(); sensor_intel.pausar()
+    if not hackrf_resource.acquire('nearfield', timeout=5.0):
+        hackrf_resource.zerar(); hackrf_resource.acquire('nearfield', timeout=3.0)
+    _radio_ativo.set()
+    loop = asyncio.get_event_loop()
+    proc = None
+    try:
+        import queue as _queue
+        SR = 2_000_000
+        proc = subprocess.Popen(
+            ["hackrf_transfer", "-r", "-", "-f", str(int(freq * 1e6)),
+             "-s", str(SR), "-g", str(int(vga)), "-l", str(int(lna)), "-a", "0"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
+        await ws.send_text(json.dumps({"ok": True, "freq_mhz": freq, "lna": lna, "vga": vga}))
+
+        CHUNK = 160_000          # ~40ms @ 2Msps (80k amostras) -> ~25 Hz
+        q: "_queue.Queue" = _queue.Queue(maxsize=8)
+
+        def _reader():
+            while True:
+                try:
+                    d = proc.stdout.read(CHUNK)
+                except Exception:
+                    d = b""
+                if not d:
+                    try: q.put_nowait(None)
+                    except _queue.Full: pass
+                    break
+                try: q.put_nowait(d)
+                except _queue.Full:
+                    try: q.get_nowait()
+                    except _queue.Empty: pass
+                    try: q.put_nowait(d)
+                    except _queue.Full: pass
+        threading.Thread(target=_reader, daemon=True, name="nf-reader").start()
+
+        async def _enviar():
+            while True:
+                d = await loop.run_in_executor(None, q.get)
+                if d is None:
+                    break
+                try:
+                    a = np.frombuffer(d, dtype=np.int8).astype(np.float32)
+                    a = a[:(a.size // 2) * 2]              # garante par (I,Q)
+                    if a.size < 4:
+                        continue
+                    i = a[0::2]; qd = a[1::2]
+                    pot = float(np.mean(i * i + qd * qd))
+                    rssi = 10.0 * np.log10(pot / (127.0**2) + 1e-9)   # dBFS
+                    await ws.send_text(json.dumps({"rssi": round(rssi, 1)}))
+                except Exception:
+                    break
+        envio = asyncio.create_task(_enviar())
+        try:
+            while True:
+                msg = await ws.receive_text()
+                if msg.strip().upper() == "STOP":
+                    break
+        except (WebSocketDisconnect, Exception):
+            pass
+        envio.cancel()
+    finally:
+        if proc:
+            proc.terminate()
+            try: proc.wait(timeout=2)
+            except Exception: pass
+        _radio_ativo.clear()
+        _radio_lock.release()
+        hackrf_resource.release()
+        sensor_hackrf.retomar(); sensor_espectro.retomar(); sensor_intel.retomar()
+
+
 # ─── Inteligência Espectral ───────────────────────────────────────────────────
 @app.websocket("/ws/intel")
 async def ws_intel(ws: WebSocket):

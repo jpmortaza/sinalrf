@@ -235,6 +235,7 @@
           acao = `<button class="btn" style="padding:4px 10px" onclick="inspecionarVideo(${s.freq_mhz})">📹 vídeo</button>`;
         else
           acao = `<span class="st">sem áudio</span>`;
+        acao += ` <a class="btn" style="padding:4px 8px;text-decoration:none" href="/sonda.html?freq=${s.freq_mhz}" target="_blank" title="Localizar fisicamente com a sonda">🔎</a>`;
         html += `<tr>
           <td><span class="badge s${s.suspeita}">${lbl}</span>${nov}</td>
           <td class="freq">${fmtFreq(s.freq_mhz)}</td>
