@@ -49,42 +49,42 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────
-   TEMA NEUTRO — IDE profissional
+   TEMA CLARO — fundo claro, texto escuro (profissional)
    ────────────────────────────────────────────────────────────────── */
 html[data-theme="neutral"] {
-  --bg:   #111827; --bg2: #1f2937; --bg3: #374151; --bg4: #4b5563;
-  --g:    #e5e7eb; --g2:  #9ca3af; --g3: #6b7280;  --g4: #374151;
-  --y:    #fbbf24; --y2:  #d97706;
-  --r:    #f87171; --r2:  rgba(248,113,113,.30);
-  --b:    #60a5fa; --b2:  #2563eb;
-  --o:    #fb923c;
-  --p:    #c084fc; --p2:  #9333ea;
-  --c:    #34d399;
-  --border:    rgba(255,255,255,.08);
-  --border2:   rgba(255,255,255,.18);
+  --bg:   #f4f6f9; --bg2: #ffffff; --bg3: #eaeef3; --bg4: #dde3ea;
+  --g:    #1f2a37; --g2:  #3b4a5a; --g3: #6b7a8a;  --g4: #e3e9f0;
+  --y:    #b7791f; --y2:  #8a5a00;
+  --r:    #d12f26; --r2:  rgba(209,47,38,.12);
+  --b:    #1f6feb; --b2:  #1a5fd0;
+  --o:    #c2410c;
+  --p:    #7c3aed; --p2:  #6d28d9;
+  --c:    #0d9488;
+  --border:    rgba(0,0,0,.10);
+  --border2:   rgba(0,0,0,.20);
   --glow-g:    none;
   --glow-y:    none;
   --glow-r:    none;
   --glow-b:    none;
   --glow-p:    none;
 
-  --fundo:    #111827;
-  --painel:   #1f2937;
-  --painel2:  #374151;
-  --borda:    rgba(255,255,255,.08);
-  --verde:    #e5e7eb;
-  --amarelo:  #fbbf24;
-  --verm:     #f87171;
-  --azul:     #60a5fa;
-  --roxo:     #c084fc;
-  --ciano:    #34d399;
-  --laranja:  #fb923c;
-  --txt:      #6b7280;
-  --txt2:     #9ca3af;
-  --cyan:     #34d399;
-  --green:    #e5e7eb;
-  --red:      #f87171;
-  --amber:    #fbbf24;
+  --fundo:    #f4f6f9;
+  --painel:   #ffffff;
+  --painel2:  #eaeef3;
+  --borda:    rgba(0,0,0,.10);
+  --verde:    #15803d;
+  --amarelo:  #b7791f;
+  --verm:     #d12f26;
+  --azul:     #1f6feb;
+  --roxo:     #7c3aed;
+  --ciano:    #0d9488;
+  --laranja:  #c2410c;
+  --txt:      #6b7a8a;
+  --txt2:     #3b4a5a;
+  --cyan:     #0d9488;
+  --green:    #15803d;
+  --red:      #d12f26;
+  --amber:    #b7791f;
 }
 
 /* ──────────────────────────────────────────────────────────────────

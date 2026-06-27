@@ -61,7 +61,7 @@
     localStorage.setItem(LS_KEY, t);
     document.documentElement.setAttribute('data-theme', t === 'neutral' ? 'neutral' : '');
     const btn = document.getElementById('srfThemeBtn');
-    if (btn) btn.title = t === 'neutral' ? 'Mudar para tema preto' : 'Mudar para tema neutro';
+    if (btn) btn.title = t === 'neutral' ? 'Mudar para tema escuro' : 'Mudar para tema claro';
     if (btn) btn.textContent = t === 'neutral' ? '◑' : '◐';
   }
 
@@ -74,7 +74,7 @@
 
     const t = getTheme();
     const icon = t === 'neutral' ? '◑' : '◐';
-    const title = t === 'neutral' ? 'Mudar para tema preto' : 'Mudar para tema neutro';
+    const title = t === 'neutral' ? 'Mudar para tema escuro' : 'Mudar para tema claro';
 
     return `
       <a class="srf-logo" href="/">mtz<span>RF</span></a>
