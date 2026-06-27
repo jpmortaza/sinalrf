@@ -81,6 +81,7 @@
           <span id="srfWsLbl">OFF</span>
         </div>
         <span class="srf-hrf" id="srfHrfBadge">RF —</span>
+        <button class="srf-theme" id="srfFsBtn" title="Tela cheia / janela">⛶</button>
         <button class="srf-theme" id="srfThemeBtn" title="${title}">${icon}</button>
       </div>`;
   }
@@ -113,6 +114,22 @@
     document.getElementById('srfThemeBtn').addEventListener('click', () => {
       setTheme(getTheme() === 'neutral' ? 'black' : 'neutral');
     });
+
+    // Toggle de tela cheia (entra/sai do fullscreen imersivo)
+    const fsBtn = document.getElementById('srfFsBtn');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', () => {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        } else {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      });
+      document.addEventListener('fullscreenchange', () => {
+        fsBtn.textContent = document.fullscreenElement ? '🗗' : '⛶';
+        fsBtn.title = document.fullscreenElement ? 'Sair da tela cheia' : 'Tela cheia';
+      });
+    }
 
     // Botões START / STOP do HackRF
     const btnStart = document.getElementById('srfHkStart');

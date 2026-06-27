@@ -55,7 +55,8 @@ $nav = $cands | Where-Object { Test-Path $_ } | Select-Object -First 1
 L "nav=$nav"
 if (-not $nav) { Start-Process $url; exit 0 }
 
-$argl = @("--kiosk", $url, "--edge-kiosk-type=fullscreen", "--no-first-run",
+# modo app: janela limpa (sem abas/URL) mas COM minimizar/maximizar/fechar nativos
+$argl = @("--app=$url", "--start-maximized", "--no-first-run",
           "--no-default-browser-check", "--user-data-dir=$dataDir")
 try { Start-Process $nav -ArgumentList $argl; L "edge lancado" } catch { L "ERRO edge: $_" }
 Start-Sleep -Seconds 3
