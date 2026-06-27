@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // ALERTAS</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
+    .hdr{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px}
+    .hdr h1{font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:var(--glow-g)}
+    .hdr .sub{color:var(--g3);font-size:11px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:12px}
+    .card h2{font-size:11px;letter-spacing:2px;color:var(--g2);margin-bottom:10px;text-transform:uppercase}
+    .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .btn{padding:8px 14px;border-radius:4px;border:1px solid var(--border2);background:var(--g4);color:var(--g);cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600}
+    .btn.sec{background:transparent;color:var(--g2)} .btn.on{background:var(--g);color:#000}
+    .btn.del{background:var(--r2);border-color:var(--r);color:var(--r)}
+    input,select{background:var(--bg);border:1px solid var(--border2);color:var(--g);padding:7px;border-radius:4px;font-family:var(--font);font-size:12px}
+    .toggle{display:flex;align-items:center;gap:6px;color:var(--g2);cursor:pointer} .toggle input{accent-color:var(--g)}
+    .st{font-size:11px;color:var(--g3)} .st.ok{color:var(--g)}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{text-align:left;color:var(--g3);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border2)}
+    td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+    .n1{color:var(--b)} .n2{color:var(--y)} .n3{color:var(--r);font-weight:700}
+    .badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700}
+    .b1{background:var(--b2);color:#fff} .b2{background:var(--y2);color:#000} .b3{background:var(--r);color:#fff}
+    .empty{color:var(--g3);text-align:center;padding:24px;font-size:11px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>🔔 ALERTAS</h1>
+      <span class="sub">monitor automático em background · rogue AP / câmeras / novos dispositivos (não usa HackRF)</span>
+    </div>
+
+    <div class="card">
+      <h2>Monitoramento</h2>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn" id="toggleBtn" onclick="toggle()">▶ ativar monitor</button>
+        <label class="toggle"><input type="checkbox" id="tWifi" checked> WiFi (rogue AP)</label>
+        <label class="toggle"><input type="checkbox" id="tRede" checked> Rede (câmeras/dispositivos)</label>
+        <label class="st">intervalo:
+          <select id="intervalo">
+            <option value="120">2 min</option>
+            <option value="300" selected>5 min</option>
+            <option value="600">10 min</option>
+            <option value="1800">30 min</option>
+          </select>
+        </label>
+        <label class="toggle"><input type="checkbox" id="som" checked> som</label>
+        <span class="st" id="st"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:8px">
+        <h2 style="margin:0">Alertas <span class="st" id="nAl"></span></h2>
+        <button class="btn sec" onclick="carregar()">⟳ atualizar</button>
+        <button class="btn del" onclick="limpar()">limpar</button>
+      </div>
+      <div id="lista"><div class="empty">Sem alertas. Ative o monitor para vigiar a rede.</div></div>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    let ativo = false, ultimoMaxId = 0;
+
+    async function aplicar(){
+      const tarefas = [];
+      if(document.getElementById('tWifi').checked) tarefas.push('wifi');
+      if(document.getElementById('tRede').checked) tarefas.push('rede');
+      const d = await (await fetch('/api/agendador/config',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ativo, intervalo_s:+document.getElementById('intervalo').value, tarefas})})).json();
+      pinta(d);
+    }
+    function toggle(){ ativo=!ativo; aplicar(); }
+    function pinta(estado){
+      const b=document.getElementById('toggleBtn');
+      b.textContent = ativo?'■ parar monitor':'▶ ativar monitor';
+      b.className = 'btn'+(ativo?' on':'');
+      document.getElementById('st').textContent = (estado&&estado.ultima_exec)?('última: '+estado.ultima_exec):(ativo?'iniciando…':'parado');
+    }
+
+    async function carregar(){
+      const d = await (await fetch('/api/alertas')).json();
+      ativo = d.estado.cfg.ativo; pinta(d.estado);
+      const a = d.alertas||[];
+      document.getElementById('nAl').textContent = `(${a.length})`;
+      if(!a.length){ document.getElementById('lista').innerHTML='<div class="empty">Nenhum alerta.</div>'; return; }
+      // som em alerta novo de nivel>=2
+      const maxId = a[0].id||0;
+      if(document.getElementById('som').checked && ultimoMaxId && maxId>ultimoMaxId && a.some(x=>x.id>ultimoMaxId && x.nivel>=2)) beep();
+      ultimoMaxId = maxId;
+      let h='<table><thead><tr><th>quando</th><th>nível</th><th>tipo</th><th>alerta</th></tr></thead><tbody>';
+      a.forEach(x=>{ h+=`<tr><td>${x.ts}</td><td><span class="badge b${x.nivel}">${['info','info','atenção','SUSPEITO'][x.nivel]||'info'}</span></td><td>${x.tipo}</td><td class="n${x.nivel}">${esc(x.msg)}</td></tr>`; });
+      document.getElementById('lista').innerHTML=h+'</tbody></table>';
+    }
+    function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+    async function limpar(){ await fetch('/api/alertas',{method:'DELETE'}); carregar(); }
+    function beep(){ try{ const c=new (window.AudioContext||window.webkitAudioContext)(); const o=c.createOscillator(); const g=c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value=880; g.gain.value=0.1; o.start(); setTimeout(()=>{o.stop();c.close();},250);}catch{} }
+
+    ['intervalo','tWifi','tRede'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{ if(ativo) aplicar(); }));
+    carregar(); setInterval(carregar, 10000);
+  </script>
+</body>
+</html>

@@ -13,6 +13,7 @@
     { href: '/rede.html',      label: 'CÂMERAS IP',   icon: '📷' },
     { href: '/wifi.html',      label: 'WIFI · RT',    icon: '🛜' },
     { href: '/historico.html', label: 'HISTÓRICO',    icon: '🗂' },
+    { href: '/alertas.html',   label: 'ALERTAS',      icon: '🔔' },
     { href: '/3d.html',        label: '3D RF',        icon: '🔮' },
     { href: '/doppler.html',   label: 'DOPPLER',      icon: '🫀' },
     { href: '/health.html',    label: 'SAÚDE',        icon: '❤️'  },
@@ -30,6 +31,7 @@
     '/rede.html':      'idle',
     '/wifi.html':      'idle',
     '/historico.html': 'idle',
+    '/alertas.html':   'idle',
     '/3d.html':        'completo',
     '/doppler.html':   'doppler',
     '/health.html':    'completo',
@@ -131,6 +133,27 @@
         fsBtn.textContent = document.fullscreenElement ? '🗗' : '⛶';
         fsBtn.title = document.fullscreenElement ? 'Sair da tela cheia' : 'Tela cheia';
       });
+    }
+
+    // Contador de alertas no menu (poll leve em todas as páginas)
+    const alLink = document.querySelector('.srf-link[href="/alertas.html"]');
+    if (alLink) {
+      const atualizaAlertas = async () => {
+        try {
+          const d = await (await fetch('/api/alertas')).json();
+          const n = (d.alertas || []).length;
+          const altos = (d.alertas || []).filter(a => a.nivel >= 2).length;
+          let b = alLink.querySelector('.srf-albadge');
+          if (n > 0) {
+            if (!b) { b = document.createElement('span'); b.className = 'srf-albadge'; alLink.appendChild(b); }
+            b.textContent = ' ' + n;
+            b.style.cssText = 'margin-left:4px;padding:0 5px;border-radius:8px;font-size:9px;font-weight:700;background:' +
+              (altos ? 'var(--r)' : 'var(--g3)') + ';color:#fff;';
+          } else if (b) { b.remove(); }
+        } catch {}
+      };
+      atualizaAlertas();
+      setInterval(atualizaAlertas, 15000);
     }
 
     // Botões START / STOP do HackRF

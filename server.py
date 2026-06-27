@@ -52,6 +52,7 @@ import tscm_video
 import net_scanner
 import wifi_tools
 import historico
+import agendador
 try:
     import llm_client
     _LLM_OK = True
@@ -651,6 +652,7 @@ async def lifespan(_app: FastAPI):
     asyncio.create_task(_loop_broadcast())
     asyncio.create_task(_loop_intel_broadcast())
     asyncio.create_task(_loop_imsi_broadcast())
+    agendador.iniciar()         # monitor WiFi/rede em background (alertas)
     yield
     sensor_audio.parar()
     sensor_hackrf.parar()
@@ -1052,6 +1054,27 @@ async def relatorio(eid: str):
     if not h:
         raise HTTPException(404, "relatório não encontrado")
     return HTMLResponse(h)
+
+
+# ─── Alertas e agendamento (monitor WiFi/rede em background) ──────────────────
+@app.get("/api/alertas")
+async def alertas_listar():
+    return {"estado": agendador.estado(), "alertas": agendador.alertas()}
+
+
+@app.post("/api/agendador/config")
+async def agendador_config(body: dict):
+    return agendador.configurar(
+        ativo=body.get("ativo"),
+        intervalo_s=body.get("intervalo_s"),
+        tarefas=body.get("tarefas"),
+    )
+
+
+@app.delete("/api/alertas")
+async def alertas_limpar():
+    agendador.limpar()
+    return {"ok": True}
 
 
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────
