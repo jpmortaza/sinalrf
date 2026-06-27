@@ -53,6 +53,7 @@ import net_scanner
 import wifi_tools
 import historico
 import agendador
+import gps_monitor
 try:
     import llm_client
     _LLM_OK = True
@@ -1077,6 +1078,21 @@ async def alertas_limpar():
     return {"ok": True}
 
 
+# ─── GPS — detector de jamming/interferência (defensivo, só recepção) ─────────
+@app.post("/api/gps/medir")
+async def gps_medir(body: dict = None):
+    sensor_hackrf.pausar(); sensor_espectro.pausar(); sensor_intel.pausar()
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, gps_monitor.medir)
+
+
+@app.post("/api/gps/calibrar")
+async def gps_calibrar():
+    sensor_hackrf.pausar(); sensor_espectro.pausar(); sensor_intel.pausar()
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, gps_monitor.calibrar)
+
+
 # ─── Rádio Operacional — Endpoints de HackRF ──────────────────────────────────
 SINAIS_DIR = Path(__file__).parent / "sinais"
 SINAIS_DIR.mkdir(exist_ok=True)
@@ -2014,8 +2030,8 @@ async def hackrf_start(body: dict):
     elif modo in ("imsi", "intercept"):
         sensor_imsi.iniciar_captura()
         iniciados = ["imsi/grgsm"]
-    elif modo in ("radio", "emergencia", "idle", "tscm", "analista"):
-        # HackRF fica livre — a própria página assume (varrer / sintonizar)
+    elif modo in ("radio", "emergencia", "idle", "tscm", "analista", "gps"):
+        # HackRF fica livre — a própria página assume (varrer / sintonizar / medir)
         iniciados = []
 
     return {"ok": True, "modo": modo, "iniciados": iniciados, "dono": hackrf_resource.dono()}

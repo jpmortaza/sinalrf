@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // GPS</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap{max-width:1000px;margin:0 auto;padding:16px 20px 60px}
+    .hdr{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px}
+    .hdr h1{font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:var(--glow-g)}
+    .hdr .sub{color:var(--g3);font-size:11px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:12px}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .btn{padding:9px 16px;border-radius:4px;border:1px solid var(--border2);background:var(--g4);color:var(--g);cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:1px}
+    .btn:hover:not(:disabled){background:var(--g3);box-shadow:var(--glow-g)} .btn:disabled{opacity:.4}
+    .btn.sec{background:transparent;color:var(--g2)} .btn.on{background:var(--g);color:#000}
+    .toggle{display:flex;align-items:center;gap:6px;color:var(--g2);cursor:pointer} .toggle input{accent-color:var(--g)}
+    .status{font-size:34px;font-weight:800;letter-spacing:2px;margin:6px 0}
+    .s-LIMPO{color:var(--g)} .s-ANOMALIA{color:var(--y)} .s-JAMMING{color:var(--r);text-shadow:0 0 16px rgba(255,59,48,.6)}
+    .msg{color:var(--g2);font-size:12px;margin-bottom:8px}
+    .grid{display:flex;gap:22px;flex-wrap:wrap;font-size:12px;margin-top:8px}
+    .grid b{color:var(--g);font-size:16px} .grid span{color:var(--g3)}
+    canvas{display:block;width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px}
+    .st{font-size:11px;color:var(--g3)} .st.busy{color:var(--y)} .st.err{color:var(--r)} .st.ok{color:var(--g)}
+    .legend{color:var(--g3);font-size:10px;margin-top:8px;line-height:1.6}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>🛰️ GPS — DETECTOR DE JAMMING</h1>
+      <span class="sub">recepção passiva do L1 (1575,42 MHz) · detecta interferência/jamming · não transmite</span>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn" id="medirBtn" onclick="medir()">📡 medir agora</button>
+        <button class="btn sec" onclick="calibrar()" title="Captura uma referência do ambiente limpo p/ comparar depois">★ calibrar baseline</button>
+        <label class="toggle"><input type="checkbox" id="auto" onchange="toggleAuto()"> contínuo (5s)</label>
+        <span class="st" id="st">Pronto.</span>
+      </div>
+      <div class="status" id="status">—</div>
+      <div class="msg" id="msg">Clique em "medir agora" para checar a banda GPS.</div>
+      <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:11px;letter-spacing:2px;color:var(--g2);margin-bottom:10px">Espectro da banda L1</h2>
+      <canvas id="esp" height="160"></canvas>
+      <div class="legend">
+        GPS normal = linha plana (sinal abaixo do ruído). <b style="color:var(--r)">Pico alto</b> = jammer.
+        ⚠ Só recepção — esta ferramenta nunca transmite na banda GPS.
+      </div>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    let timer = null;
+    function setSt(t,c){const e=document.getElementById('st');e.textContent=t;e.className='st '+(c||'')}
+
+    async function medir(){
+      const b=document.getElementById('medirBtn'); b.disabled=true; setSt('medindo a banda L1…','busy');
+      try{
+        const d = await (await fetch('/api/gps/medir',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
+        if(!d.ok){ setSt('⚠ '+(d.motivo||'falha'),'err'); return; }
+        render(d); setSt('✓ medido','ok');
+      }catch(e){ setSt('⚠ '+e.message,'err'); } finally{ b.disabled=false; }
+    }
+    async function calibrar(){
+      setSt('calibrando baseline…','busy');
+      try{ const d=await (await fetch('/api/gps/calibrar',{method:'POST'})).json();
+        setSt(d.ok?`★ baseline: ${d.band_db} dBm`:'falha', d.ok?'ok':'err'); }catch(e){ setSt('⚠ '+e.message,'err'); }
+    }
+    function toggleAuto(){
+      if(document.getElementById('auto').checked){ medir(); timer=setInterval(medir,5000); }
+      else if(timer){ clearInterval(timer); timer=null; }
+    }
+    function render(d){
+      const s=document.getElementById('status'); s.textContent=d.status; s.className='status s-'+d.status;
+      document.getElementById('msg').textContent=d.msg;
+      document.getElementById('grid').innerHTML =
+        `<div><b>${d.crista_db}</b> <span>dB acima do ruído</span></div>`+
+        `<div><b>${d.floor_db}</b> <span>piso (dBm)</span></div>`+
+        `<div><b>${d.pico_db}</b> <span>pico (dBm)</span></div>`+
+        `<div><b>${d.off_khz}</b> <span>offset (kHz)</span></div>`+
+        (d.delta_baseline!=null?`<div><b>${d.delta_baseline>=0?'+':''}${d.delta_baseline}</b> <span>vs baseline</span></div>`:'');
+      desenhar(d.espectro, d.status);
+    }
+    function desenhar(esp, status){
+      const cv=document.getElementById('esp'); cv.width=cv.clientWidth;
+      const ctx=cv.getContext('2d'), W=cv.width, H=cv.height; ctx.clearRect(0,0,W,H);
+      if(!esp||!esp.length) return;
+      const mn=Math.min(...esp)-2, mx=Math.max(...esp)+2;
+      const cor = status==='JAMMING'?'#FF3B30':status==='ANOMALIA'?'#F5D800':'#47DF7F';
+      ctx.strokeStyle=cor; ctx.lineWidth=1.4; ctx.beginPath();
+      esp.forEach((v,i)=>{ const x=i/(esp.length-1)*W, y=H-(v-mn)/(mx-mn||1)*H; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+      ctx.stroke();
+    }
+    // assume controle do HackRF p/ a página
+    fetch('/api/hackrf/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:'gps'})}).catch(()=>{});
+    window.addEventListener('beforeunload',()=>{ if(timer) clearInterval(timer); });
+  </script>
+</body>
+</html>
