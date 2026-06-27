@@ -36,7 +36,7 @@ except ImportError:
 
 import numpy as np
 from scipy import signal as sp_signal
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Request, Body
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -58,6 +58,7 @@ import sentinela
 import burst_hunter
 import adsb_scanner
 import ism_decoder
+import ble_scanner
 try:
     import llm_client
     _LLM_OK = True
@@ -583,9 +584,11 @@ sensor_imsi      = ScannerIMSI(
     sensor_intel=sensor_intel,
 )
 sensor_adsb      = adsb_scanner.ADSB()
+localizador_ble  = ble_scanner.LocalizadorBLE()
 clientes: set[WebSocket] = set()
 clientes_intel: set[WebSocket] = set()
 clientes_imsi:  set[WebSocket] = set()
+clientes_ble:   set[WebSocket] = set()
 
 
 # ─── Loop de captura: lê RSSI a cada 100ms (binário Swift = 12ms) ─────────────
@@ -664,6 +667,7 @@ async def lifespan(_app: FastAPI):
     sensor_intel.parar()
     sensor_imsi.parar_captura()
     sensor_adsb.parar()
+    localizador_ble.parar()
 
 
 # ─── App ──────────────────────────────────────────────────────────────────────
@@ -924,6 +928,71 @@ async def ws_nearfield(ws: WebSocket,
         _radio_lock.release()
         hackrf_resource.release()
         sensor_hackrf.retomar(); sensor_espectro.retomar(); sensor_intel.retomar()
+
+
+# ─── Localizador BLE (encontrar pessoas pelos aparelhos que carregam) ─────────
+@app.websocket("/ws/ble")
+async def ws_ble(ws: WebSocket):
+    """Lista dispositivos BLE ao vivo (MAC+RSSI) p/ localização por gradiente.
+    Usa o Bluetooth do PC (NÃO o HackRF). Mensagens do cliente:
+      {"alvo": "AA:BB:.."}  -> seleciona aparelho a localizar
+      {"alvo": null}        -> limpa o alvo
+    Empurra estado() a ~5 Hz."""
+    await ws.accept()
+    if not localizador_ble.disponivel:
+        await ws.send_text(json.dumps(
+            {"erro": "Bluetooth/bleak indisponível: " + (localizador_ble.erro or "?")}))
+        await ws.close(); return
+
+    clientes_ble.add(ws)
+    localizador_ble.iniciar()
+
+    async def _receber():
+        try:
+            while True:
+                msg = await ws.receive_text()
+                try:
+                    j = json.loads(msg)
+                    if "alvo" in j:
+                        localizador_ble.selecionar(j["alvo"])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    rt = asyncio.create_task(_receber())
+    try:
+        while True:
+            await ws.send_text(json.dumps(localizador_ble.estado(), ensure_ascii=False))
+            await asyncio.sleep(0.2)   # 5 Hz
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        rt.cancel()
+        clientes_ble.discard(ws)
+        if not clientes_ble:          # libera o rádio BT quando ninguém olha
+            localizador_ble.parar()
+
+
+@app.get("/api/ble")
+async def api_ble():
+    """Snapshot do localizador BLE (inicia o scan sob demanda)."""
+    localizador_ble.iniciar()
+    return localizador_ble.estado()
+
+
+@app.post("/api/ble/alvo")
+async def api_ble_alvo(payload: dict = Body(default={})):
+    """Seleciona (ou limpa) o aparelho a localizar. Body: {"mac": "AA:.." | null}."""
+    localizador_ble.selecionar(payload.get("mac"))
+    return {"ok": True, "alvo": localizador_ble.alvo}
+
+
+@app.post("/api/ble/stop")
+async def api_ble_stop():
+    """Para o scan BLE e libera o rádio Bluetooth."""
+    localizador_ble.parar()
+    return {"ok": True}
 
 
 # ─── Inteligência Espectral ───────────────────────────────────────────────────

@@ -5,3 +5,4 @@ scipy>=1.13.0
 sounddevice>=0.5.0
 python-dotenv>=1.0.0
 pyModeS>=2.13,<3       # decode ADS-B (radar de aviões)
+bleak>=0.22.0          # BLE (localizar pessoas pelos aparelhos) — Windows via WinRT

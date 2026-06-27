@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // Localizar Pessoas (BLE)</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    body { overflow-x: hidden; }
+    .pp-wrap { padding: 14px 18px; max-width: 1200px; }
+    .pp-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+    .pp-head h1 { font-size:18px; letter-spacing:1px; margin:0; }
+    .pp-head .sub { font-size:11px; color:var(--g3); }
+    .pp-note {
+      font-size:11px; color:var(--g3); line-height:1.6; background:var(--bg2);
+      border:1px solid var(--border); border-left:3px solid var(--y);
+      padding:8px 12px; margin:8px 0 14px; border-radius:4px;
+    }
+    .pp-note b { color:var(--g2); }
+
+    .pp-grid { display:grid; grid-template-columns: 1fr 360px; gap:14px; align-items:start; }
+    @media (max-width: 880px){ .pp-grid{ grid-template-columns:1fr; } }
+
+    /* status bar */
+    .pp-status { display:flex; gap:14px; align-items:center; font-size:11px; color:var(--g3);
+      border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:10px; flex-wrap:wrap; }
+    .pp-status b { color:var(--g); }
+    .pp-dot { width:7px;height:7px;border-radius:50%;background:var(--g4);display:inline-block;margin-right:5px; }
+    .pp-dot.on { background:var(--g); box-shadow:var(--glow-g); }
+
+    /* device list */
+    .dev { display:grid; grid-template-columns: 26px 1fr auto; gap:10px; align-items:center;
+      padding:9px 11px; border:1px solid var(--border); background:var(--bg2);
+      border-radius:6px; margin-bottom:7px; cursor:pointer; transition:border-color .15s, background .15s; }
+    .dev:hover { border-color:var(--border2); }
+    .dev.alvo { border-color:var(--g); background:rgba(71,223,127,.06); }
+    .dev .ico { font-size:18px; text-align:center; }
+    .dev .nome { font-size:13px; color:var(--g); font-weight:600; }
+    .dev .meta { font-size:10px; color:var(--g4); margin-top:2px; }
+    .dev .right { text-align:right; min-width:120px; }
+    .dev .rssi { font-size:15px; font-weight:700; color:var(--g2); }
+    .dev .dist { font-size:10px; color:var(--g4); }
+    .bar { height:5px; background:var(--bg3); border-radius:3px; margin-top:4px; overflow:hidden; }
+    .bar > i { display:block; height:100%; background:linear-gradient(90deg,var(--g3),var(--g)); }
+    .trend { font-size:13px; margin-left:6px; }
+    .up { color:var(--g); } .down{ color:var(--r); } .flat{ color:var(--g4); }
+
+    .empty { color:var(--g4); font-size:12px; padding:20px; text-align:center; }
+
+    /* homing panel */
+    .home { border:1px solid var(--border); background:var(--bg2); border-radius:8px;
+      padding:16px; position:sticky; top:14px; }
+    .home.off { opacity:.55; }
+    .home h2 { font-size:12px; letter-spacing:2px; color:var(--g3); margin:0 0 4px; }
+    .home .target { font-size:15px; color:var(--g); font-weight:700; min-height:20px; }
+    .home .ttype { font-size:11px; color:var(--g4); margin-bottom:12px; }
+    .gauge { text-align:center; padding:18px 0 8px; border-radius:8px; transition:background .4s; }
+    .gauge .big { font-size:52px; font-weight:800; line-height:1; }
+    .gauge .unit { font-size:13px; color:var(--g4); }
+    .gauge .word { font-size:20px; font-weight:800; letter-spacing:3px; margin-top:8px; }
+    .gauge .dm { font-size:12px; color:var(--g3); margin-top:4px; }
+    #spark { width:100%; height:54px; display:block; margin-top:10px; }
+    .home .row { display:flex; gap:8px; margin-top:12px; }
+    .btn { flex:1; background:transparent; border:1px solid var(--border2); color:var(--g2);
+      font-family:var(--font); font-size:11px; padding:8px; cursor:pointer; letter-spacing:1px;
+      border-radius:5px; transition:all .15s; }
+    .btn:hover { border-color:var(--g); color:var(--g); }
+    .btn.on { border-color:var(--g); color:var(--g); background:rgba(71,223,127,.08); }
+    .hint { font-size:10px; color:var(--g4); margin-top:10px; line-height:1.6; }
+  </style>
+</head>
+<body>
+<script src="nav.js"></script>
+
+<div class="pp-wrap">
+  <div class="pp-head">
+    <h1>🎯 Localizar Pessoas</h1>
+    <span class="sub">por dispositivos BLE · Bluetooth do PC · não usa o HackRF</span>
+  </div>
+
+  <div class="pp-note">
+    Encontra <b>aparelhos que as pessoas carregam</b> (celular, relógio, pulseira, fones) e
+    mede o sinal ao vivo. Selecione um aparelho e <b>caminhe</b> — o medidor <b>esquenta</b>
+    quando você se aproxima (igual à Sonda). Limites honestos:
+    celulares usam <b>MAC aleatório</b> (não identifica a mesma pessoa entre sessões) e a
+    <b>distância é estimativa grosseira</b> — serve para "mais perto / mais longe", não como medida.
+  </div>
+
+  <div class="pp-status">
+    <span><span class="pp-dot" id="dot"></span><span id="conn">conectando…</span></span>
+    <span>dispositivos: <b id="cnt">—</b></span>
+    <span id="errbox" style="color:var(--r)"></span>
+  </div>
+
+  <div class="pp-grid">
+    <div>
+      <div id="lista"><div class="empty">Procurando dispositivos Bluetooth próximos…</div></div>
+    </div>
+
+    <div class="home off" id="home">
+      <h2>// LOCALIZAR</h2>
+      <div class="target" id="tNome">nenhum alvo selecionado</div>
+      <div class="ttype" id="tTipo">toque em “LOCALIZAR” num dispositivo da lista</div>
+
+      <div class="gauge" id="gauge">
+        <div><span class="big" id="gRssi">—</span> <span class="unit">dBm</span></div>
+        <div class="word" id="gWord">—</div>
+        <div class="dm" id="gDist"></div>
+      </div>
+      <canvas id="spark"></canvas>
+
+      <div class="row">
+        <button class="btn" id="btnTom" onclick="toggleTom()">🔊 TOM</button>
+        <button class="btn" id="btnClear" onclick="limparAlvo()">✕ SOLTAR</button>
+      </div>
+      <div class="hint">
+        Dica: ande devagar e gire o corpo. Quando o número <b>sobe</b> (fica menos negativo)
+        e a seta fica <span class="up">▲</span>, você está esquentando.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══ mtzRF — Localizar Pessoas (BLE) ═══ */
+let _ws = null, _dados = null, _alvo = null;
+let _audioOn = false, _ac = null, _osc = null, _gain = null;
+
+function conectar() {
+  _ws = new WebSocket(`ws://${location.host}/ws/ble`);
+  _ws.onopen  = () => { if (window.srfNav) srfNav.setWs(true); setConn(true); };
+  _ws.onclose = () => { if (window.srfNav) srfNav.setWs(false); setConn(false); setTimeout(conectar, 2000); };
+  _ws.onmessage = ev => { try { _dados = JSON.parse(ev.data); render(_dados); } catch {} };
+}
+function setConn(on){
+  document.getElementById('dot').className = 'pp-dot' + (on?' on':'');
+  document.getElementById('conn').textContent = on ? 'escaneando' : 'desconectado';
+}
+
+const ICONE = {
+  'celular':'📱','relógio/pulseira':'⌚','fone':'🎧','TV/mídia':'📺',
+  'tag/beacon':'🏷️','aparelho pessoal':'📲','—':'📡'
+};
+
+function render(d){
+  if (d.erro){ document.getElementById('errbox').textContent = '⚠ ' + d.erro; }
+  document.getElementById('cnt').textContent = d.n ?? '—';
+  _alvo = d.alvo;
+
+  const devs = d.dispositivos || [];
+  const lista = document.getElementById('lista');
+  if (!devs.length){
+    lista.innerHTML = '<div class="empty">Nenhum dispositivo BLE no alcance ainda…</div>';
+  } else {
+    lista.innerHTML = devs.map(dv => {
+      const rssi = dv.rssi_s ?? dv.rssi;
+      const pct  = rssi==null ? 0 : Math.max(0, Math.min(100, (rssi + 100) / 60 * 100));
+      const seta = dv.trend > 1.2 ? '<span class="trend up">▲</span>'
+                 : dv.trend < -1.2 ? '<span class="trend down">▼</span>'
+                 : '<span class="trend flat">•</span>';
+      const dist = dv.dist_m!=null ? `~${dv.dist_m} m` : '';
+      const fab  = dv.fab ? ` · ${dv.fab}` : '';
+      return `<div class="dev${dv.alvo?' alvo':''}" onclick="selecionar('${dv.mac}')">
+        <div class="ico">${ICONE[dv.tipo]||'📡'}</div>
+        <div>
+          <div class="nome">${esc(dv.nome)}</div>
+          <div class="meta">${dv.tipo}${fab} · ${dv.mac} · visto há ${dv.idade}s</div>
+          <div class="bar"><i style="width:${pct}%"></i></div>
+        </div>
+        <div class="right">
+          <div class="rssi">${rssi==null?'—':rssi}${seta}</div>
+          <div class="dist">${dist}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // painel de localização
+  const alvoDev = devs.find(x => x.mac === _alvo);
+  atualizarHome(alvoDev);
+}
+
+function esc(s){ return (s||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+function selecionar(mac){
+  _alvo = mac;
+  if (_ws && _ws.readyState===1) _ws.send(JSON.stringify({alvo: mac}));
+}
+function limparAlvo(){
+  _alvo = null;
+  if (_ws && _ws.readyState===1) _ws.send(JSON.stringify({alvo: null}));
+  pararTom();
+}
+
+function atualizarHome(dv){
+  const home = document.getElementById('home');
+  if (!dv){
+    home.classList.add('off');
+    document.getElementById('tNome').textContent = 'nenhum alvo selecionado';
+    document.getElementById('tTipo').textContent = 'toque em “LOCALIZAR” num dispositivo da lista';
+    document.getElementById('gRssi').textContent = '—';
+    document.getElementById('gWord').textContent = '—';
+    document.getElementById('gDist').textContent = '';
+    document.getElementById('gauge').style.background = 'transparent';
+    desenharSpark([]);
+    return;
+  }
+  home.classList.remove('off');
+  document.getElementById('tNome').textContent = dv.nome;
+  document.getElementById('tTipo').textContent = `${ICONE[dv.tipo]||''} ${dv.tipo}${dv.fab?' · '+dv.fab:''}`;
+
+  const rssi = dv.rssi_s ?? dv.rssi;
+  document.getElementById('gRssi').textContent = rssi==null ? '—' : rssi;
+  document.getElementById('gDist').textContent = dv.dist_m!=null ? `≈ ${dv.dist_m} m (estimado)` : '';
+
+  // quente/frio por RSSI + tendência
+  const t = dv.trend;
+  let word, wcol, bg;
+  if (t > 1.2){ word='ESQUENTANDO ▲'; wcol='var(--g)'; }
+  else if (t < -1.2){ word='ESFRIANDO ▼'; wcol='var(--r)'; }
+  else { word='ESTÁVEL'; wcol='var(--g3)'; }
+  // fundo do gauge por intensidade do sinal (perto = mais verde)
+  const hot = rssi==null ? 0 : Math.max(0, Math.min(1, (rssi + 95) / 55));
+  bg = `rgba(${Math.round(255*(1-hot))},${Math.round(120+135*hot)},${Math.round(80)},${0.10+0.18*hot})`;
+  const w = document.getElementById('gWord');
+  w.textContent = word; w.style.color = wcol;
+  document.getElementById('gauge').style.background = bg;
+
+  desenharSpark(dv.hist || []);
+  if (_audioOn) tomRssi(rssi);
+}
+
+/* sparkline do histórico de RSSI */
+const sp = document.getElementById('spark'), spx = sp.getContext('2d');
+function desenharSpark(hist){
+  const W = sp.width = sp.offsetWidth, H = sp.height = 54;
+  spx.clearRect(0,0,W,H);
+  if (!hist || hist.length < 2) return;
+  const min=-100, max=-30;
+  spx.beginPath();
+  hist.forEach((r,i)=>{
+    const x = i/(hist.length-1)*W;
+    const y = H - (Math.max(min,Math.min(max,r))-min)/(max-min)*H;
+    i?spx.lineTo(x,y):spx.moveTo(x,y);
+  });
+  spx.strokeStyle='#47DF7F'; spx.lineWidth=1.8; spx.shadowColor='#47DF7F'; spx.shadowBlur=5;
+  spx.stroke(); spx.shadowBlur=0;
+}
+
+/* tom sonoro: pitch sobe quando o sinal fica mais forte (mais perto) */
+function toggleTom(){ _audioOn ? pararTom() : iniciarTom(); }
+function iniciarTom(){
+  try{
+    _ac = _ac || new (window.AudioContext||window.webkitAudioContext)();
+    _osc = _ac.createOscillator(); _gain = _ac.createGain();
+    _osc.type='sine'; _gain.gain.value=0.08;
+    _osc.connect(_gain); _gain.connect(_ac.destination); _osc.start();
+    _audioOn = true; document.getElementById('btnTom').classList.add('on');
+  }catch(e){}
+}
+function pararTom(){
+  _audioOn=false; document.getElementById('btnTom').classList.remove('on');
+  try{ if(_osc){_osc.stop(); _osc.disconnect();} }catch(e){}
+  _osc=null;
+}
+function tomRssi(rssi){
+  if(!_osc || rssi==null) return;
+  const hot = Math.max(0, Math.min(1, (rssi + 95) / 55));   // 0..1
+  _osc.frequency.value = 200 + hot*1000;                     // 200..1200 Hz
+  _gain.gain.value = 0.04 + hot*0.10;
+}
+
+window.addEventListener('resize', ()=>{ if(_dados) render(_dados); });
+conectar();
+</script>
+</body>
+</html>
