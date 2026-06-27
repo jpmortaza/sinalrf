@@ -87,6 +87,14 @@ html[data-theme="neutral"] {
   --amber:    #b7791f;
 }
 
+/* No tema claro, os badges âmbar/laranja ficam com fundo escuro:
+   força texto branco neles (sobrepõe o 'color:#000' das páginas). */
+html[data-theme="neutral"] .s2,
+html[data-theme="neutral"] .c2,
+html[data-theme="neutral"] .b2,
+html[data-theme="neutral"] .seg-WPA,
+html[data-theme="neutral"] .seg-WEP { color: #fff !important; }
+
 /* ──────────────────────────────────────────────────────────────────
    BASE
    ────────────────────────────────────────────────────────────────── */
