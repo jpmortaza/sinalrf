@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mtzRF // SENTINELA</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    .wrap{max-width:1280px;margin:0 auto;padding:16px 20px 60px}
+    .hdr{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:14px}
+    .hdr h1{font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:var(--glow-g)}
+    .hdr .sub{color:var(--g3);font-size:11px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:14px}
+    .card h2{font-size:11px;letter-spacing:2px;color:var(--g2);margin-bottom:10px;text-transform:uppercase}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .btn{padding:9px 16px;border-radius:4px;border:1px solid var(--border2);background:var(--g4);color:var(--g);cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:1px}
+    .btn:hover:not(:disabled){background:var(--g3);box-shadow:var(--glow-g)} .btn:disabled{opacity:.4}
+    .btn.sec{background:transparent;color:var(--g2)} .btn.on{background:var(--g);color:#000} .btn.stop{background:var(--r2);border-color:var(--r);color:var(--r)}
+    input,select{background:var(--bg);border:1px solid var(--border2);color:var(--g);padding:8px;border-radius:4px;font-family:var(--font);font-size:12px}
+    .st{font-size:11px;color:var(--g3)} .st.ok{color:var(--g)} .st.busy{color:var(--y)} .st.err{color:var(--r)}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{text-align:left;color:var(--g3);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border2);letter-spacing:1px}
+    td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+    tr:hover td{background:var(--bg3)} tr.alta td{background:var(--r2)}
+    canvas{display:block;width:100%;background:var(--bg);border:1px solid var(--border);border-radius:4px}
+    .badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700}
+    .pill{display:inline-flex;gap:8px;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:7px 11px;margin:4px 0;font-size:11px}
+    .empty{color:var(--g3);text-align:center;padding:20px;font-size:11px}
+    .legend{color:var(--g3);font-size:10px;margin-top:8px;line-height:1.6}
+    .big{font-size:26px;font-weight:800;letter-spacing:1px}
+    .dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--g3)} .dot.on{background:var(--g);box-shadow:0 0 8px var(--g)} .dot.mon{background:var(--y);box-shadow:0 0 8px var(--y)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>🛡️ SENTINELA — INTELIGÊNCIA DE RF</h1>
+      <span class="sub">aprende o "RF normal" de um local · varre e compara · vigia 24/7 e alerta anomalias</span>
+      <span class="st" id="scanSt" style="margin-left:auto"></span>
+    </div>
+
+    <!-- 1. Baseline -->
+    <div class="card">
+      <h2>1 · Baseline do local (aprender o RF normal)</h2>
+      <div class="row" style="margin-bottom:10px">
+        <input id="local" placeholder="nome do local (ex: escritório-sala1)" style="flex:1;min-width:200px">
+        <button class="btn" id="aprBtn" onclick="aprenderToggle()">▶ aprender baseline</button>
+        <span class="st" id="aprSt">o scanner varre 88 MHz–6 GHz a cada ~12s; deixe aprender alguns minutos</span>
+      </div>
+      <div id="baselines"></div>
+      <div class="legend">O baseline guarda o nível máximo por frequência (broadcast, celular, WiFi…). Depois, tudo que ultrapassar isso vira anomalia. Aprenda com o ambiente "limpo".</div>
+    </div>
+
+    <!-- 2. Varredura / comparar -->
+    <div class="card">
+      <h2>2 · Varredura — comparar agora</h2>
+      <div class="row" style="margin-bottom:10px">
+        <select id="cmpLocal"></select>
+        <button class="btn" onclick="comparar()">⟳ comparar com baseline</button>
+        <label class="st">margem: <input id="margem" type="number" value="8" min="3" max="30" style="width:54px"> dB</label>
+        <span class="st" id="cmpSt"></span>
+      </div>
+      <canvas id="pano" height="150"></canvas>
+      <div class="legend">linha = espectro atual · área de base = baseline · marcas vermelhas = anomalias (acima do baseline + margem)</div>
+      <div id="anoms" style="margin-top:10px"></div>
+    </div>
+
+    <!-- 3. Monitor 24/7 -->
+    <div class="card">
+      <h2>3 · Monitor 24/7 (sentinela)</h2>
+      <div class="row">
+        <span class="dot" id="monDot"></span>
+        <select id="monLocal"></select>
+        <button class="btn" id="monBtn" onclick="monitorarToggle()">▶ armar sentinela</button>
+        <span class="st" id="monSt">desarmado</span>
+      </div>
+      <div class="legend">Deixe o app aberto (ou o servidor rodando) vigiando o local. Quando surge um sinal novo/anômalo persistente, vira <b>alerta</b> 🔔 (aba ALERTAS) e entra no histórico. O scanner precisa estar ativo.</div>
+    </div>
+  </div>
+
+  <script src="nav.js"></script>
+  <script>
+    let aprendendo=false, monitorando=false;
+    const $=id=>document.getElementById(id);
+    function setSt(id,t,c){const e=$(id);e.textContent=t;e.className='st '+(c||'')}
+
+    async function estado(){
+      try{
+        const d=await (await fetch('/api/sentinela/estado')).json();
+        const e=d.estado;
+        aprendendo=e.aprendendo; monitorando=e.monitorando;
+        $('scanSt').textContent = e.scanner_ok ? '● scanner ativo' : '○ scanner inativo — clique START (modo scanner)';
+        $('scanSt').className = 'st '+(e.scanner_ok?'ok':'err');
+        $('aprBtn').textContent = aprendendo ? `■ salvar baseline (${e.n_aprend} varreduras)` : '▶ aprender baseline';
+        $('aprBtn').className = 'btn'+(aprendendo?' on':'');
+        if(aprendendo) setSt('aprSt', `aprendendo… ${e.n_aprend} varreduras capturadas — clique para salvar`, 'busy');
+        $('monDot').className = 'dot'+(monitorando?' mon':'');
+        $('monBtn').textContent = monitorando ? '■ parar sentinela' : '▶ armar sentinela';
+        $('monBtn').className = 'btn'+(monitorando?' on':'');
+        setSt('monSt', monitorando ? `vigiando "${e.local}" · margem ${e.margem_db}dB · última: ${e.ultima_cmp||'—'} · ${e.ultimo_n_anom} anomalia(s)` : 'desarmado', monitorando?'ok':'');
+        renderBaselines(d.baselines||[]);
+      }catch{}
+    }
+
+    function renderBaselines(bs){
+      const sel=v=>v.map(b=>`<option value="${b.local}">${b.local} (${b.n_sweeps}v · ${b.f_min_mhz}-${b.f_max_mhz}MHz)</option>`).join('');
+      const keep1=$('cmpLocal').value, keep2=$('monLocal').value;
+      $('cmpLocal').innerHTML=sel(bs); $('monLocal').innerHTML=sel(bs);
+      if(keep1) $('cmpLocal').value=keep1; if(keep2) $('monLocal').value=keep2;
+      $('baselines').innerHTML = bs.length ? bs.map(b=>
+        `<div class="pill"><b>${b.local}</b> <span class="st">${b.ts} · ${b.n_sweeps} varreduras · ${b.f_min_mhz}–${b.f_max_mhz} MHz</span>
+          <button class="btn sec" style="padding:3px 8px" onclick="excluir('${b.local}')">excluir</button></div>`).join('')
+        : '<div class="empty">Nenhum baseline salvo. Aprenda o RF normal de um local acima.</div>';
+    }
+
+    async function aprenderToggle(){
+      if(aprendendo){
+        const d=await (await fetch('/api/sentinela/aprender/salvar',{method:'POST'})).json();
+        setSt('aprSt', d.ok?`✓ baseline "${d.local}" salvo (${d.n_sweeps} varreduras)`:'⚠ '+(d.erro||'falha'), d.ok?'ok':'err');
+      } else {
+        const local=$('local').value.trim(); if(!local){ setSt('aprSt','dê um nome ao local','err'); return; }
+        await fetch('/api/sentinela/aprender/iniciar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({local})});
+      }
+      estado();
+    }
+
+    async function comparar(){
+      const local=$('cmpLocal').value; if(!local){ setSt('cmpSt','crie/selecione um baseline','err'); return; }
+      await fetch('/api/sentinela/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({margem_db:+$('margem').value})});
+      setSt('cmpSt','comparando…','busy');
+      const d=await (await fetch('/api/sentinela/comparar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({local})})).json();
+      if(!d.ok){ setSt('cmpSt','⚠ '+(d.erro||'falha'),'err'); return; }
+      setSt('cmpSt',`✓ ${d.n_anomalias} anomalia(s) vs "${local}" (baseline ${d.baseline_ts})`, d.n_anomalias?'busy':'ok');
+      desenhar(d.panorama, d.anomalias);
+      $('anoms').innerHTML = d.anomalias.length ? tabela(d.anomalias) : '<div class="empty">Nenhuma anomalia — o ambiente bate com o baseline ✓</div>';
+    }
+    function tabela(a){
+      let h='<table><thead><tr><th>nível</th><th>freq</th><th>atual</th><th>baseline</th><th>Δ</th><th>tipo</th><th>banda</th></tr></thead><tbody>';
+      a.forEach(x=>{ h+=`<tr class="${x.delta_db>=15?'alta':''}">
+        <td><span class="badge" style="background:${x.delta_db>=15?'var(--r)':'var(--y2)'};color:#fff">${x.delta_db>=15?'ALTA':'média'}</span></td>
+        <td style="font-weight:700;color:var(--g)">${x.freq_mhz} MHz</td><td>${x.dbm} dBm</td><td>${x.base_dbm} dBm</td>
+        <td style="color:var(--r)">+${x.delta_db}</td><td>${x.cat}</td><td class="st">${x.desc}</td></tr>`; });
+      return h+'</tbody></table>';
+    }
+    function desenhar(p,anom){
+      const cv=$('pano'); cv.width=cv.clientWidth; const ctx=cv.getContext('2d'),W=cv.width,H=cv.height; ctx.clearRect(0,0,W,H);
+      if(!p||!p.freqs||!p.freqs.length) return;
+      const fs=p.freqs, at=p.atual, bs=p.base;
+      const mn=Math.min(...bs,...at)-3, mx=Math.max(...at,...bs)+3;
+      const x=f=>(f-fs[0])/((fs[fs.length-1]-fs[0])||1)*W, y=d=>H-(d-mn)/((mx-mn)||1)*H;
+      // baseline (área)
+      ctx.fillStyle='rgba(120,140,160,.18)'; ctx.beginPath(); ctx.moveTo(0,H);
+      fs.forEach((f,i)=>ctx.lineTo(x(f),y(bs[i]))); ctx.lineTo(W,H); ctx.fill();
+      // atual
+      ctx.strokeStyle='#2eb861'; ctx.lineWidth=1.2; ctx.beginPath();
+      fs.forEach((f,i)=>{const px=x(f),py=y(at[i]); i?ctx.lineTo(px,py):ctx.moveTo(px,py)}); ctx.stroke();
+      // anomalias
+      (anom||[]).forEach(a=>{ const px=x(a.freq_mhz); ctx.strokeStyle=a.delta_db>=15?'#FF3B30':'#F5D800'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,H); ctx.stroke(); });
+    }
+
+    async function monitorarToggle(){
+      if(monitorando){ await fetch('/api/sentinela/monitorar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({on:false})}); }
+      else { const local=$('monLocal').value; if(!local){ setSt('monSt','selecione um baseline','err'); return; }
+        await fetch('/api/sentinela/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({margem_db:+$('margem').value})});
+        await fetch('/api/sentinela/monitorar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({local,on:true})}); }
+      estado();
+    }
+    async function excluir(local){ if(!confirm('Excluir baseline "'+local+'"?'))return; await fetch('/api/sentinela/baseline?local='+encodeURIComponent(local),{method:'DELETE'}); estado(); }
+
+    // garante o scanner rodando p/ a Sentinela
+    fetch('/api/hackrf/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo:'scanner'})}).catch(()=>{});
+    estado(); setInterval(estado, 5000);
+  </script>
+</body>
+</html>

@@ -338,6 +338,21 @@ class ScannerInteligente:
                 s["n_ativo"] += 1
                 s["ts_ultimo"] = self._ultimo_ts
 
+    # ── Espectro bruto (para a Sentinela) ──────────────────────────────────────
+    def espectro_bruto(self) -> Optional[dict]:
+        """Retorna o espectro completo atual (não-downsampled) para baseline/diff.
+        { sweeps, freqs_hz[np], dbm[np], base[np] } ou None se ainda não varreu."""
+        with self._lock:
+            if self._freqs_hz is None or self._dbm_cur is None:
+                return None
+            return {
+                "sweeps":   self.sweeps,
+                "ts":       self._ultimo_ts,
+                "freqs_hz": self._freqs_hz.copy(),
+                "dbm":      self._dbm_cur.copy(),
+                "base":     (self._dbm_base.copy() if self._dbm_base is not None else self._dbm_cur.copy()),
+            }
+
     # ── Saída de dados ─────────────────────────────────────────────────────────
     def inteligencia(self) -> dict:
         with self._lock:

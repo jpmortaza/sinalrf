@@ -54,6 +54,7 @@ import wifi_tools
 import historico
 import agendador
 import gps_monitor
+import sentinela
 try:
     import llm_client
     _LLM_OK = True
@@ -654,6 +655,7 @@ async def lifespan(_app: FastAPI):
     asyncio.create_task(_loop_intel_broadcast())
     asyncio.create_task(_loop_imsi_broadcast())
     agendador.iniciar()         # monitor WiFi/rede em background (alertas)
+    sentinela.configurar(sensor_intel, agendador._add, historico.salvar)  # inteligência RF
     yield
     sensor_audio.parar()
     sensor_hackrf.parar()
@@ -1076,6 +1078,47 @@ async def agendador_config(body: dict):
 async def alertas_limpar():
     agendador.limpar()
     return {"ok": True}
+
+
+# ─── Sentinela — inteligência de RF (baseline + monitoramento) ────────────────
+@app.get("/api/sentinela/estado")
+async def sentinela_estado():
+    return {"estado": sentinela.estado(), "baselines": sentinela.listar()}
+
+
+@app.post("/api/sentinela/aprender/iniciar")
+async def sentinela_aprender_iniciar(body: dict):
+    # garante o scanner rodando p/ aprender
+    sensor_espectro.retomar(); sensor_intel.retomar()
+    return sentinela.aprender_iniciar(body.get("local", "local"))
+
+
+@app.post("/api/sentinela/aprender/salvar")
+async def sentinela_aprender_salvar():
+    return sentinela.aprender_salvar()
+
+
+@app.post("/api/sentinela/comparar")
+async def sentinela_comparar(body: dict):
+    sensor_espectro.retomar(); sensor_intel.retomar()
+    return sentinela.comparar(body.get("local", ""))
+
+
+@app.post("/api/sentinela/monitorar")
+async def sentinela_monitorar(body: dict):
+    if body.get("on"):
+        sensor_espectro.retomar(); sensor_intel.retomar()
+    return sentinela.monitorar(body.get("local", ""), bool(body.get("on")))
+
+
+@app.post("/api/sentinela/config")
+async def sentinela_config(body: dict):
+    return sentinela.config(margem_db=body.get("margem_db"))
+
+
+@app.delete("/api/sentinela/baseline")
+async def sentinela_excluir(local: str = Query(...)):
+    return {"ok": sentinela.excluir(local)}
 
 
 # ─── GPS — detector de jamming/interferência (defensivo, só recepção) ─────────

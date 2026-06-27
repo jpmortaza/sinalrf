@@ -20,6 +20,7 @@ em HTML/JS puro, com streaming de dados via WebSocket a 10 Hz.
 - **Rádio FM** (WFM/NFM/AM) com nomes de estações brasileiras
 - **Scanner de espectro** 88–6000 MHz com categorização (FM, celular, WiFi, 5G…) e histórico waterfall
 - **Analista de Espectro (TSCM)** — varre faixas de escutas/câmeras (VHF/UHF, 1.2/2.4/5.8 GHz, GSM), classifica cada sinal (provável escuta, câmera, WiFi, celular), **entra na transmissão de áudio** para identificar e tenta **decodificar a imagem de câmeras analógicas FM** (NTSC/PAL, monocromático, experimental); baseline p/ destacar sinais novos
+- **Sentinela (inteligência de RF)** — aprende o "RF normal" de um local (baseline persistente 88 MHz–6 GHz), **compara** numa varredura pontual para achar sinais novos/mais fortes, e **monitora 24/7** disparando alertas (🔔 + histórico) quando surge uma anomalia persistente. Só recepção
 - **Câmeras IP/WiFi (rede)** — escaneia a rede do PC e lista todos os dispositivos com **IP, MAC, fabricante e portas** (RTSP/ONVIF), destacando as câmeras. Não usa HackRF — é o único jeito de obter o IP de câmeras WiFi (o tráfego RF é criptografado)
 - **WiFi Red Team (testes autorizados)** — gerenciador de adaptadores, **recon WiFi** (APs, canal, segurança, sinal), **detecção de rogue AP/evil-twin** e **portal cativo de conscientização** anti-phishing (captura local + revelação educativa, só com campanha autorizada). Sem deauth/jamming. Uso restrito a redes próprias ou com autorização escrita
 - **Ambiente RF 3D** — canvas 2D com projeção em perspectiva (pilares, esferas, partículas)
@@ -142,6 +143,7 @@ Com o servidor no ar, acesse: **http://localhost:8765**
 | `/radio.html` | Rádio FM |
 | `/scanner.html` | Scanner de espectro / inteligência |
 | `/analista.html` | **Analista de Espectro (TSCM)** — varre escutas/câmeras e escuta a transmissão |
+| `/sentinela.html` | **Sentinela (inteligência RF)** — baseline por local, comparação de anomalias e monitoramento 24/7 com alertas |
 | `/rede.html` | **Câmeras IP/WiFi** — escaneia a rede e lista dispositivos/câmeras (IP, MAC, fabricante, portas) |
 | `/wifi.html` | **WiFi Red Team** — adaptadores, recon WiFi, detecção de rogue AP e portal de conscientização (uso autorizado) |
 | `/3d.html` | Ambiente RF 3D |
