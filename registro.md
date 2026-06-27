@@ -6,6 +6,17 @@
 
 ---
 
+## 2026-06-26 · Fix TTS cross-platform + firmware do HackRF
+
+**TTS de emergência multiplataforma:** `_tts_para_wav` usava `say`/`afconvert` (só macOS)
+→ no Windows dava `WinError 2`. Agora detecta a plataforma: Windows usa SAPI
+(System.Speech via PowerShell, prefere voz pt-BR), macOS mantém say+afconvert, Linux usa
+espeak-ng/espeak. Verificado: gera WAV mono 22050/16-bit e o modulador FM lê OK.
+
+**Firmware do HackRF atualizado:** 2021.03.1 (API 1.04) → 2026.01.3 (API 1.10), via
+`hackrf_spiflash` com o firmware oficial (release v2026.01.3), alinhando com libhackrf
+2026.01.3. Device verificado operando (sweep real pós-update).
+
 ## 2026-06-26 · WiFi Red Team (testes autorizados)
 
 **Pedido do Jean:** aba para testes de WiFi, principalmente engenharia social (portal falso

@@ -63,15 +63,45 @@ _radio_ativo = threading.Event()  # sinaliza que radio está em uso
 
 # ─── FM Modulator ─────────────────────────────────────────────────────────────
 def _tts_para_wav(texto: str, voz: str = "Luciana") -> bytes:
-    """Usa macOS say + afconvert para gerar WAV mono 22050 Hz a partir de texto."""
+    """Gera WAV PCM mono a partir de texto — multiplataforma.
+
+    Windows: SAPI (System.Speech, já incluso). macOS: say+afconvert.
+    Linux: espeak-ng/espeak. Prefere voz pt-BR quando disponível.
+    """
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
-        aiff = os.path.join(tmp, "tts.aiff")
-        wav  = os.path.join(tmp, "tts.wav")
-        subprocess.run(["say", "-v", voz, "-o", aiff, "--", texto],
-                       check=True, timeout=30, capture_output=True)
-        subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@22050",
-                        aiff, wav], check=True, timeout=10, capture_output=True)
+        wav = os.path.join(tmp, "tts.wav")
+
+        if sys.platform == "win32":
+            txt = os.path.join(tmp, "tts.txt")
+            with open(txt, "w", encoding="utf-8") as f:
+                f.write(texto)
+            ps = (
+                "Add-Type -AssemblyName System.Speech;"
+                f"$t=Get-Content -Raw -Encoding UTF8 '{txt}';"
+                "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;"
+                "$v=$s.GetInstalledVoices()|?{$_.VoiceInfo.Culture.Name -like 'pt*'}|"
+                "Select-Object -First 1;if($v){$s.SelectVoice($v.VoiceInfo.Name)};"
+                f"$s.SetOutputToWaveFile('{wav}');$s.Speak($t);$s.Dispose()"
+            )
+            subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                           check=True, timeout=40, capture_output=True)
+
+        elif sys.platform == "darwin":
+            aiff = os.path.join(tmp, "tts.aiff")
+            subprocess.run(["say", "-v", voz, "-o", aiff, "--", texto],
+                           check=True, timeout=30, capture_output=True)
+            subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@22050",
+                            aiff, wav], check=True, timeout=10, capture_output=True)
+
+        else:  # Linux
+            try:
+                subprocess.run(["espeak-ng", "-v", "pt-br", "-w", wav, texto],
+                               check=True, timeout=30, capture_output=True)
+            except (OSError, subprocess.CalledProcessError):
+                subprocess.run(["espeak", "-v", "pt", "-w", wav, texto],
+                               check=True, timeout=30, capture_output=True)
+
         with open(wav, "rb") as f:
             return f.read()
 
