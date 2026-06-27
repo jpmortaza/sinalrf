@@ -56,7 +56,7 @@
 
   /* ── Tema ────────────────────────────────────────────────────── */
   const LS_KEY = 'srf-theme';
-  function getTheme() { return localStorage.getItem(LS_KEY) || 'black'; }
+  function getTheme() { return localStorage.getItem(LS_KEY) || 'neutral'; }
   function setTheme(t) {
     localStorage.setItem(LS_KEY, t);
     document.documentElement.setAttribute('data-theme', t === 'neutral' ? 'neutral' : '');
