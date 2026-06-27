@@ -1,54 +1,54 @@
-/* mtzRF — Nav unificada + gestão de tema
-   Injeta #srf-nav em todas as páginas.
+/* mtzRF — Menu lateral unificado + tema + controles do HackRF
+   Injeta #srf-nav (sidebar) em todas as páginas.
    Expõe: window.srfNav.setWs(bool), window.srfNav.setHrf(bool)
 */
 (function () {
   'use strict';
 
-  const PAGES = [
-    { href: '/',               label: 'DASHBOARD',   icon: '⚡' },
-    { href: '/radio.html',     label: 'RÁDIO FM',     icon: '📻' },
-    { href: '/scanner.html',   label: 'SCANNER',      icon: '🌌' },
-    { href: '/analista.html',  label: 'ANALISTA',     icon: '🕵️' },
-    { href: '/sentinela.html', label: 'SENTINELA',    icon: '🛡️' },
-    { href: '/burst.html',     label: 'BURST',        icon: '💥' },
-    { href: '/sonda.html',     label: 'SONDA',        icon: '🔎' },
-    { href: '/adsb.html',      label: 'AVIÕES',       icon: '✈️' },
-    { href: '/ism.html',       label: 'ISM/IoT',      icon: '📟' },
-    { href: '/rede.html',      label: 'CÂMERAS IP',   icon: '📷' },
-    { href: '/wifi.html',      label: 'WIFI · RT',    icon: '🛜' },
-    { href: '/historico.html', label: 'HISTÓRICO',    icon: '🗂' },
-    { href: '/alertas.html',   label: 'ALERTAS',      icon: '🔔' },
-    { href: '/gps.html',       label: 'GPS',          icon: '🛰️' },
-    { href: '/3d.html',        label: '3D RF',        icon: '🔮' },
-    { href: '/doppler.html',   label: 'DOPPLER',      icon: '🫀' },
-    { href: '/health.html',    label: 'SAÚDE',        icon: '❤️'  },
-    { href: '/intercept.html',  label: 'IMSI · INTCP', icon: '📱' },
-    { href: '/emergencia.html', label: 'EMERGÊNCIA',   icon: '🚨' },
+  /* ── Páginas agrupadas ───────────────────────────────────────── */
+  const GRUPOS = [
+    { g: 'Painel', itens: [
+      { href: '/', label: 'Dashboard', icon: '⚡' },
+    ]},
+    { g: 'Inteligência RF', itens: [
+      { href: '/analista.html',  label: 'Analista TSCM', icon: '🕵️' },
+      { href: '/sentinela.html', label: 'Sentinela',     icon: '🛡️' },
+      { href: '/burst.html',     label: 'Burst Hunter',  icon: '💥' },
+      { href: '/sonda.html',     label: 'Sonda',         icon: '🔎' },
+      { href: '/scanner.html',   label: 'Scanner',       icon: '🌌' },
+    ]},
+    { g: 'Decodificar', itens: [
+      { href: '/radio.html',     label: 'Rádio FM',      icon: '📻' },
+      { href: '/adsb.html',      label: 'Aviões ADS-B',  icon: '✈️' },
+      { href: '/ism.html',       label: 'ISM / IoT',     icon: '📟' },
+      { href: '/intercept.html', label: 'IMSI',          icon: '📱' },
+    ]},
+    { g: 'Rede & WiFi', itens: [
+      { href: '/rede.html',      label: 'Câmeras IP',    icon: '📷' },
+      { href: '/wifi.html',      label: 'WiFi Red Team', icon: '🛜' },
+    ]},
+    { g: 'Sinais & Defesa', itens: [
+      { href: '/gps.html',       label: 'GPS Jamming',   icon: '🛰️' },
+      { href: '/doppler.html',   label: 'Doppler',       icon: '🫀' },
+      { href: '/health.html',    label: 'Saúde RF',      icon: '❤️' },
+      { href: '/3d.html',        label: 'Ambiente 3D',   icon: '🔮' },
+      { href: '/emergencia.html',label: 'Emergência',    icon: '🚨' },
+    ]},
+    { g: 'Dados', itens: [
+      { href: '/historico.html', label: 'Histórico',     icon: '🗂' },
+      { href: '/alertas.html',   label: 'Alertas',       icon: '🔔' },
+    ]},
   ];
 
-  /* ── Modo de HackRF por página (para o botão START) ──────────── */
+  /* ── Modo de HackRF por página (botão START) ─────────────────── */
   const MODOS = {
-    '/':               'completo',
-    '/index.html':     'completo',
-    '/radio.html':     'radio',
-    '/scanner.html':   'scanner',
-    '/analista.html':  'tscm',
-    '/sentinela.html': 'scanner',
-    '/burst.html':     'tscm',
-    '/sonda.html':     'tscm',
-    '/adsb.html':      'idle',
-    '/ism.html':       'tscm',
-    '/rede.html':      'idle',
-    '/wifi.html':      'idle',
-    '/historico.html': 'idle',
-    '/alertas.html':   'idle',
-    '/gps.html':       'gps',
-    '/3d.html':        'completo',
-    '/doppler.html':   'doppler',
-    '/health.html':    'completo',
-    '/intercept.html': 'imsi',
-    '/emergencia.html':'emergencia',
+    '/': 'completo', '/index.html': 'completo',
+    '/radio.html': 'radio', '/scanner.html': 'scanner', '/analista.html': 'tscm',
+    '/sentinela.html': 'scanner', '/burst.html': 'tscm', '/sonda.html': 'tscm',
+    '/adsb.html': 'idle', '/ism.html': 'tscm', '/rede.html': 'idle', '/wifi.html': 'idle',
+    '/historico.html': 'idle', '/alertas.html': 'idle', '/gps.html': 'gps',
+    '/3d.html': 'completo', '/doppler.html': 'doppler', '/health.html': 'completo',
+    '/intercept.html': 'imsi', '/emergencia.html': 'emergencia',
   };
   function modoAtual() {
     const p = location.pathname;
@@ -57,7 +57,6 @@
     return 'completo';
   }
 
-  /* ── Detectar página ativa ───────────────────────────────────── */
   function isActive(href) {
     const p = location.pathname;
     if (href === '/') return p === '/' || p === '/index.html';
@@ -67,7 +66,6 @@
   /* ── Tema ────────────────────────────────────────────────────── */
   const LS_KEY = 'srf-theme';
   function getTheme() {
-    // páginas de console (data-force-dark) sempre escuras
     if (document.documentElement.hasAttribute('data-force-dark')) return 'black';
     return localStorage.getItem(LS_KEY) || 'neutral';
   }
@@ -75,94 +73,109 @@
     localStorage.setItem(LS_KEY, t);
     document.documentElement.setAttribute('data-theme', t === 'neutral' ? 'neutral' : '');
     const btn = document.getElementById('srfThemeBtn');
-    if (btn) btn.title = t === 'neutral' ? 'Mudar para tema escuro' : 'Mudar para tema claro';
-    if (btn) btn.textContent = t === 'neutral' ? '◑' : '◐';
+    if (btn) { btn.title = t === 'neutral' ? 'Tema escuro' : 'Tema claro'; btn.textContent = t === 'neutral' ? '◑' : '◐'; }
   }
 
-  /* ── Build nav HTML ──────────────────────────────────────────── */
+  /* ── Grupos colapsáveis (estado salvo) ───────────────────────── */
+  const grpClosed = (n) => localStorage.getItem('srf-grp-' + n) === '1';
+  const setGrp = (n, closed) => localStorage.setItem('srf-grp-' + n, closed ? '1' : '0');
+
+  /* ── Build sidebar ───────────────────────────────────────────── */
   function buildNav() {
-    const links = PAGES.map(p => {
-      const active = isActive(p.href) ? ' active' : '';
-      return `<a class="srf-link${active}" href="${p.href}"><span class="srf-icon">${p.icon}</span>${p.label}</a>`;
+    const grupos = GRUPOS.map(grp => {
+      const ativo = grp.itens.some(p => isActive(p.href));
+      const closed = !ativo && grpClosed(grp.g);
+      const links = grp.itens.map(p =>
+        `<a class="srf-link${isActive(p.href) ? ' active' : ''}" href="${p.href}"><span class="srf-icon">${p.icon}</span>${p.label}</a>`
+      ).join('');
+      return `<div class="srf-group${closed ? ' closed' : ''}" data-g="${grp.g}">
+        <div class="srf-grp">${grp.g}<span class="srf-caret">▾</span></div>
+        <div class="srf-grpitems">${links}</div></div>`;
     }).join('');
 
     const t = getTheme();
-    const icon = t === 'neutral' ? '◑' : '◐';
-    const title = t === 'neutral' ? 'Mudar para tema escuro' : 'Mudar para tema claro';
-
     return `
-      <a class="srf-logo" href="/">mtz<span>RF</span></a>
-      <nav class="srf-links">${links}</nav>
-      <div class="srf-right">
-        <button class="srf-hk start" id="srfHkStart" title="Para o HackRF e inicia o processo desta página">▶ START</button>
-        <button class="srf-hk stop"  id="srfHkStop"  title="Para tudo e libera o HackRF">■ STOP</button>
-        <div class="srf-ws">
-          <span class="srf-ws-dot" id="srfWsDot"></span>
-          <span id="srfWsLbl">OFF</span>
+      <div class="srf-top">
+        <a class="srf-logo" href="/">mtz<span>RF</span></a>
+        <button class="srf-collapse" id="srfCollapse" title="Recolher menu">«</button>
+      </div>
+      <div class="srf-ctrls">
+        <div class="srf-hkrow">
+          <button class="srf-hk start" id="srfHkStart" title="Inicia o HackRF nesta página">▶ START</button>
+          <button class="srf-hk stop"  id="srfHkStop"  title="Para tudo e libera o HackRF">■ STOP</button>
         </div>
-        <span class="srf-hrf" id="srfHrfBadge">RF —</span>
-        <button class="srf-theme" id="srfFsBtn" title="Tela cheia / janela">⛶</button>
-        <button class="srf-theme" id="srfThemeBtn" title="${title}">${icon}</button>
-      </div>`;
+        <div class="srf-statusrow">
+          <span class="srf-ws"><span class="srf-ws-dot" id="srfWsDot"></span><span id="srfWsLbl">OFF</span></span>
+          <span class="srf-hrf" id="srfHrfBadge">RF —</span>
+          <span style="flex:1"></span>
+          <button class="srf-theme" id="srfFsBtn" title="Tela cheia">⛶</button>
+          <button class="srf-theme" id="srfThemeBtn" title="${t === 'neutral' ? 'Tema escuro' : 'Tema claro'}">${t === 'neutral' ? '◑' : '◐'}</button>
+        </div>
+      </div>
+      <div class="srf-scroll"><nav class="srf-links">${grupos}</nav></div>`;
   }
 
   /* ── Inject ──────────────────────────────────────────────────── */
   function inject() {
-    // Ícone da janela/aba (mtzRF) em todas as páginas
     if (!document.querySelector('link[rel="icon"]')) {
       const ic = document.createElement('link');
       ic.rel = 'icon'; ic.type = 'image/svg+xml'; ic.href = '/favicon.svg';
       document.head.appendChild(ic);
     }
 
-    // Aplica o tema salvo antes de renderizar (evita flash)
     const forceDark = document.documentElement.hasAttribute('data-force-dark');
     const saved = getTheme();
-    if (forceDark) {
-      document.documentElement.removeAttribute('data-theme');   // console sempre escuro
-    } else if (saved === 'neutral') {
-      document.documentElement.setAttribute('data-theme', 'neutral');
-    }
+    if (forceDark) document.documentElement.removeAttribute('data-theme');
+    else if (saved === 'neutral') document.documentElement.setAttribute('data-theme', 'neutral');
 
-    // Cria o elemento nav se não existir
+    // estado recolhido (salvo) ou auto-recolhe em tela estreita
+    if (localStorage.getItem('srf-sb') === 'col' || window.innerWidth < 760)
+      document.documentElement.classList.add('srf-collapsed');
+
     let nav = document.getElementById('srf-nav');
-    if (!nav) {
-      nav = document.createElement('div');
-      nav.id = 'srf-nav';
-      document.body.insertBefore(nav, document.body.firstChild);
-    }
+    if (!nav) { nav = document.createElement('div'); nav.id = 'srf-nav'; document.body.insertBefore(nav, document.body.firstChild); }
     nav.innerHTML = buildNav();
 
-    // Toggle de tema (oculto em páginas de console sempre-escuras)
-    const themeBtn = document.getElementById('srfThemeBtn');
-    if (forceDark) {
-      themeBtn.style.display = 'none';
-    } else {
-      themeBtn.addEventListener('click', () => {
-        setTheme(getTheme() === 'neutral' ? 'black' : 'neutral');
-      });
-    }
+    // burger flutuante (reabre quando recolhido)
+    let burger = document.getElementById('srf-burger');
+    if (!burger) { burger = document.createElement('button'); burger.id = 'srf-burger'; burger.textContent = '☰'; burger.title = 'Abrir menu'; document.body.appendChild(burger); }
+    const toggleSidebar = (col) => {
+      document.documentElement.classList.toggle('srf-collapsed', col);
+      localStorage.setItem('srf-sb', col ? 'col' : 'exp');
+    };
+    burger.onclick = () => toggleSidebar(false);
+    document.getElementById('srfCollapse').onclick = () => toggleSidebar(true);
 
-    // Toggle de tela cheia (entra/sai do fullscreen imersivo)
+    // grupos colapsáveis
+    nav.querySelectorAll('.srf-grp').forEach(h => {
+      h.addEventListener('click', () => {
+        const grp = h.parentElement;
+        grp.classList.toggle('closed');
+        setGrp(grp.getAttribute('data-g'), grp.classList.contains('closed'));
+      });
+    });
+
+    // tema
+    const themeBtn = document.getElementById('srfThemeBtn');
+    if (forceDark) themeBtn.style.display = 'none';
+    else themeBtn.addEventListener('click', () => setTheme(getTheme() === 'neutral' ? 'black' : 'neutral'));
+
+    // tela cheia
     const fsBtn = document.getElementById('srfFsBtn');
     if (fsBtn) {
       fsBtn.addEventListener('click', () => {
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(() => {});
-        } else {
-          document.documentElement.requestFullscreen().catch(() => {});
-        }
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else document.documentElement.requestFullscreen().catch(() => {});
       });
       document.addEventListener('fullscreenchange', () => {
         fsBtn.textContent = document.fullscreenElement ? '🗗' : '⛶';
-        fsBtn.title = document.fullscreenElement ? 'Sair da tela cheia' : 'Tela cheia';
       });
     }
 
-    // Contador de alertas no menu (poll leve em todas as páginas)
+    // contador de alertas
     const alLink = document.querySelector('.srf-link[href="/alertas.html"]');
     if (alLink) {
-      const atualizaAlertas = async () => {
+      const upd = async () => {
         try {
           const d = await (await fetch('/api/alertas')).json();
           const n = (d.alertas || []).length;
@@ -170,79 +183,46 @@
           let b = alLink.querySelector('.srf-albadge');
           if (n > 0) {
             if (!b) { b = document.createElement('span'); b.className = 'srf-albadge'; alLink.appendChild(b); }
-            b.textContent = ' ' + n;
-            b.style.cssText = 'margin-left:4px;padding:0 5px;border-radius:8px;font-size:9px;font-weight:700;background:' +
-              (altos ? 'var(--r)' : 'var(--g3)') + ';color:#fff;';
+            b.textContent = n;
+            b.style.cssText = 'margin-left:auto;padding:0 6px;border-radius:8px;font-size:9px;font-weight:700;background:' + (altos ? 'var(--r)' : 'var(--g3)') + ';color:#fff;';
           } else if (b) { b.remove(); }
         } catch {}
       };
-      atualizaAlertas();
-      setInterval(atualizaAlertas, 15000);
+      upd(); setInterval(upd, 15000);
     }
 
-    // Botões START / STOP do HackRF
+    // START / STOP
     const btnStart = document.getElementById('srfHkStart');
     const btnStop  = document.getElementById('srfHkStop');
-
     btnStart.addEventListener('click', async () => {
-      const modo = modoAtual();
-      btnStart.disabled = true;
-      btnStart.textContent = '⏳ INICIANDO';
+      btnStart.disabled = true; btnStart.textContent = '⏳';
       try {
-        const r = await fetch('/api/hackrf/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ modo }),
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.detail || 'erro');
-        btnStart.style.display = 'none';
-        btnStart.classList.add('ativo');
-        btnStop.style.display = 'inline-block';
-        window.srfNav.setHrf(true);
-      } catch (e) {
-        alert('Erro ao iniciar HackRF: ' + e.message);
-      } finally {
-        btnStart.disabled = false;
-        btnStart.textContent = '▶ START';
-      }
+        const r = await fetch('/api/hackrf/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ modo: modoAtual() }) });
+        const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'erro');
+        btnStart.style.display = 'none'; btnStart.classList.add('ativo'); btnStop.style.display = ''; window.srfNav.setHrf(true);
+      } catch (e) { alert('Erro ao iniciar HackRF: ' + e.message); }
+      finally { btnStart.disabled = false; btnStart.textContent = '▶ START'; }
     });
-
     btnStop.addEventListener('click', async () => {
-      btnStop.disabled = true;
-      btnStop.textContent = '⏳ PARANDO';
-      try {
-        await fetch('/api/hackrf/stop', { method: 'POST' });
-      } catch (e) {}
-      btnStop.style.display = 'none';
-      btnStop.disabled = false;
-      btnStop.textContent = '■ STOP';
-      btnStart.style.display = 'inline-block';
-      btnStart.classList.remove('ativo');
-      window.srfNav.setHrf(false);
+      btnStop.disabled = true; btnStop.textContent = '⏳';
+      try { await fetch('/api/hackrf/stop', { method: 'POST' }); } catch (e) {}
+      btnStop.style.display = 'none'; btnStop.disabled = false; btnStop.textContent = '■ STOP';
+      btnStart.style.display = ''; btnStart.classList.remove('ativo'); window.srfNav.setHrf(false);
     });
   }
 
-  /* ── API pública ─────────────────────────────────────────────── */
   window.srfNav = {
     setWs(on) {
-      const dot = document.getElementById('srfWsDot');
-      const lbl = document.getElementById('srfWsLbl');
+      const dot = document.getElementById('srfWsDot'), lbl = document.getElementById('srfWsLbl');
       if (dot) dot.className = 'srf-ws-dot' + (on ? ' on' : '');
       if (lbl) lbl.textContent = on ? 'WS' : 'OFF';
     },
     setHrf(on) {
-      const b = document.getElementById('srfHrfBadge');
-      if (!b) return;
-      b.textContent = on ? 'RF: ATIVO' : 'RF —';
-      b.className   = 'srf-hrf' + (on ? ' on' : '');
+      const b = document.getElementById('srfHrfBadge'); if (!b) return;
+      b.textContent = on ? 'RF: ATIVO' : 'RF —'; b.className = 'srf-hrf' + (on ? ' on' : '');
     },
   };
 
-  /* ── Executa após DOM pronto ─────────────────────────────────── */
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', inject);
-  } else {
-    inject();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject);
+  else inject();
 })();
