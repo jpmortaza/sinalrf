@@ -46,6 +46,10 @@
   --green:    #47DF7F;
   --red:      #FF3B30;
   --amber:    #F5D800;
+  --texto:    #b0b0b0;
+  --cinza:    #3a3a3a;
+  --vermelho: #FF4444;
+  --rosa:     #FF44AA;
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -85,6 +89,10 @@ html[data-theme="neutral"] {
   --green:    #15803d;
   --red:      #d12f26;
   --amber:    #b7791f;
+  --texto:    #1f2a37;
+  --cinza:    #aab2bd;
+  --vermelho: #d12f26;
+  --rosa:     #c026a8;
 }
 
 /* No tema claro, os badges âmbar/laranja ficam com fundo escuro:

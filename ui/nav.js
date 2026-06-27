@@ -56,7 +56,11 @@
 
   /* ── Tema ────────────────────────────────────────────────────── */
   const LS_KEY = 'srf-theme';
-  function getTheme() { return localStorage.getItem(LS_KEY) || 'neutral'; }
+  function getTheme() {
+    // páginas de console (data-force-dark) sempre escuras
+    if (document.documentElement.hasAttribute('data-force-dark')) return 'black';
+    return localStorage.getItem(LS_KEY) || 'neutral';
+  }
   function setTheme(t) {
     localStorage.setItem(LS_KEY, t);
     document.documentElement.setAttribute('data-theme', t === 'neutral' ? 'neutral' : '');
@@ -102,8 +106,11 @@
     }
 
     // Aplica o tema salvo antes de renderizar (evita flash)
+    const forceDark = document.documentElement.hasAttribute('data-force-dark');
     const saved = getTheme();
-    if (saved === 'neutral') {
+    if (forceDark) {
+      document.documentElement.removeAttribute('data-theme');   // console sempre escuro
+    } else if (saved === 'neutral') {
       document.documentElement.setAttribute('data-theme', 'neutral');
     }
 
@@ -116,10 +123,15 @@
     }
     nav.innerHTML = buildNav();
 
-    // Toggle de tema
-    document.getElementById('srfThemeBtn').addEventListener('click', () => {
-      setTheme(getTheme() === 'neutral' ? 'black' : 'neutral');
-    });
+    // Toggle de tema (oculto em páginas de console sempre-escuras)
+    const themeBtn = document.getElementById('srfThemeBtn');
+    if (forceDark) {
+      themeBtn.style.display = 'none';
+    } else {
+      themeBtn.addEventListener('click', () => {
+        setTheme(getTheme() === 'neutral' ? 'black' : 'neutral');
+      });
+    }
 
     // Toggle de tela cheia (entra/sai do fullscreen imersivo)
     const fsBtn = document.getElementById('srfFsBtn');
